@@ -1,0 +1,25 @@
+[
+  {
+    "id": "CC-2026-FVDATF",
+    "createdAt": "2026-05-23T13:43:47.525Z",
+    "status": "new",
+    "delivery": "ship",
+    "payment": "transfer",
+    "address": {
+      "via": "",
+      "city": "",
+      "cap": "",
+      "notes": ""
+    },
+    "items": [
+      {
+        "productId": "frozen-moe-farm",
+        "name": "Frozen Moe Farm",
+        "weight": "100g",
+        "price": 500,
+        "quantity": 1
+      }
+    ],
+    "total": 500
+  }
+]

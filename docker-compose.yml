@@ -1,0 +1,24 @@
+name: campoclaro
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_TELEGRAM_BOT_USERNAME: ${VITE_TELEGRAM_BOT_USERNAME:-}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      API_PORT: 3001
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:${CAMPOCLARO_HOST_PORT:-3101}:3001"
+    volumes:
+      - ./server/data:/app/server/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

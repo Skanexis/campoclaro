@@ -1,0 +1,33 @@
+export interface Product {
+  id: string
+  name: string
+  category: string
+  description: string
+  longDescription: string
+  prices: Record<string, number>
+  filters?: string[]
+  strains?: string[]
+  thc: string
+  cbd: string
+  tags: string[]
+  gradient: string
+  glowColor: string
+}
+
+export const FALLBACK_PRODUCTS: Product[] = [
+  {
+    id: 'frozen-moe-farm',
+    name: 'Frozen Moe Farm',
+    category: 'Club Selection',
+    description: 'Frozen quality con heavy flavour e profilo intenso.',
+    longDescription: 'Frozen Moe Farm e una selezione frozen quality dal flavour pesante e persistente. Strain disponibili: Zkittlez, Lollipopa, Hash Burger, Honey x Butter e Gush Mints.',
+    prices: { '100g': 500, '500g': 2400, '1kg': 4200 },
+    filters: ['Club Selection'],
+    strains: ['Zkittlez', 'Lollipopa', 'Hash Burger', 'Honey x Butter', 'Gush Mints'],
+    thc: 'N/D',
+    cbd: 'N/D',
+    tags: ['Frozen quality', 'Heavy flavour'],
+    gradient: 'linear-gradient(135deg, #071522 0%, #12384a 58%, #030608 100%)',
+    glowColor: 'rgba(120,205,240,0.16)',
+  },
+]
