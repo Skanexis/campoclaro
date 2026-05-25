@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { motion, AnimatePresence } from 'motion/react'
-import { Plus, Filter, ChevronDown } from 'lucide-react'
+import { Plus, Filter, Search } from 'lucide-react'
 import { Product } from './data'
 import { useCart } from '../../context/CartContext'
 import { useProducts } from '../../hooks/useProducts'
@@ -177,6 +177,33 @@ function ProductCard({ product }: { product: Product }) {
         </div>
       </Link>
 
+      <motion.button
+        type="button"
+        whileHover={{ scale: 1.06 }}
+        whileTap={{ scale: 0.94 }}
+        onClick={handleAdd}
+        title="Aggiungi al carrello"
+        style={{
+          position: 'absolute',
+          right: 10,
+          top: 10,
+          zIndex: 5,
+          width: 30,
+          height: 30,
+          borderRadius: 6,
+          border: '1px solid rgba(214,178,94,0.34)',
+          background: 'linear-gradient(135deg, rgba(214,178,94,0.92), rgba(240,201,106,0.92))',
+          color: '#050505',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.34)',
+        }}
+      >
+        <Plus size={14} />
+      </motion.button>
+
       {/* Hover Expand — Weight + CTA */}
       <AnimatePresence>
         {hovered && (
@@ -291,10 +318,16 @@ export function CatalogPage() {
   const siteContent = useSiteContent()
   const [activeCategory, setActiveCategory] = useState('Tutti')
   const [sortBy, setSortBy] = useState<'name' | 'price-asc' | 'price-desc'>('name')
+  const [query, setQuery] = useState('')
   const categories = ['Tutti', ...siteContent.productFilters]
 
   const filtered = products
     .filter(p => activeCategory === 'Tutti' || (p.filters?.length ? p.filters.includes(activeCategory) : p.category.includes(activeCategory)))
+    .filter(p => {
+      const value = query.trim().toLowerCase()
+      if (!value) return true
+      return [p.name, p.category, p.description, ...(p.tags || []), ...(p.strains || [])].join(' ').toLowerCase().includes(value)
+    })
     .sort((a, b) => {
       if (sortBy === 'price-asc') return Object.values(a.prices)[0] - Object.values(b.prices)[0]
       if (sortBy === 'price-desc') return Object.values(b.prices)[0] - Object.values(a.prices)[0]
@@ -351,7 +384,7 @@ export function CatalogPage() {
         WebkitBackdropFilter: 'blur(20px)',
         zIndex: 50,
       }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           {/* Category Pills */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {categories.map(cat => (
@@ -396,7 +429,24 @@ export function CatalogPage() {
           </div>
 
           {/* Sort */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 34, padding: '0 11px', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, background: 'rgba(255,255,255,0.025)' }}>
+              <Search size={13} color="rgba(245,245,245,0.32)" />
+              <input
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Cerca"
+                style={{
+                  width: 150,
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  color: '#F5F5F5',
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: '0.75rem',
+                }}
+              />
+            </div>
             <Filter size={14} color="rgba(245,245,245,0.3)" />
             <select
               value={sortBy}

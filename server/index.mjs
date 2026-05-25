@@ -47,6 +47,11 @@ const sessionSecret = process.env.SESSION_SECRET || 'campoclaro-dev-secret'
 const adminIds = new Set((process.env.ADMIN_TELEGRAM_IDS || '').split(',').map(v => v.trim()).filter(Boolean))
 const ccppFee = 50
 const autoDeliverCheckMs = 60 * 60 * 1000
+const cryptoPaymentCheckMs = Number(process.env.CRYPTO_PAYMENT_CHECK_MS || 120000)
+const cryptoPaymentTolerance = Number(process.env.CRYPTO_PAYMENT_TOLERANCE || 0.005)
+const btcMinConfirmations = Number(process.env.BTC_MIN_CONFIRMATIONS || 1)
+const ethMinConfirmations = Number(process.env.ETH_MIN_CONFIRMATIONS || 12)
+const tronMinConfirmations = Number(process.env.TRON_MIN_CONFIRMATIONS || 1)
 const autoDeliverDays = {
   UPS: Number(process.env.AUTO_DELIVER_UPS_DAYS || 5),
   InPost: Number(process.env.AUTO_DELIVER_INPOST_DAYS || 4),
@@ -71,6 +76,13 @@ const cryptoWallets = {
     address: 'TBcA3q7ecir9oDwiqz9CTCK6pNZXhajLGA',
   },
 }
+const cryptoMeta = {
+  BTC: { coingeckoId: 'bitcoin', decimals: 8, displayDecimals: 8 },
+  ETH: { coingeckoId: 'ethereum', decimals: 18, displayDecimals: 6 },
+  USDT_TRX: { coingeckoId: 'tether', decimals: 6, displayDecimals: 2 },
+}
+const usdtTronContract = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
+let cryptoRateCache = { at: 0, rates: null }
 
 const telegramApiBase = process.env.TELEGRAM_BOT_TOKEN
   ? `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`
@@ -102,6 +114,55 @@ async function sendTelegramMessage(chatId, text, options = {}) {
   } catch (error) {
     console.error('Telegram send failed:', error.message)
     return null
+  }
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, {
+    headers: { Accept: 'application/json', ...(options.headers || {}) },
+    ...options,
+  })
+  if (!response.ok) throw new Error(`HTTP ${response.status} ${url}`)
+  return response.json()
+}
+
+async function getCryptoRatesEur() {
+  if (cryptoRateCache.rates && Date.now() - cryptoRateCache.at < 5 * 60 * 1000) return cryptoRateCache.rates
+  const ids = Object.values(cryptoMeta).map(meta => meta.coingeckoId).join(',')
+  const data = await fetchJson(`https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids)}&vs_currencies=eur`)
+  const rates = {
+    BTC: Number(data.bitcoin?.eur || 0),
+    ETH: Number(data.ethereum?.eur || 0),
+    USDT_TRX: Number(data.tether?.eur || 0),
+  }
+  if (!rates.BTC || !rates.ETH || !rates.USDT_TRX) throw new Error('Crypto rates unavailable')
+  cryptoRateCache = { at: Date.now(), rates }
+  return rates
+}
+
+function cryptoAmountForEur(totalEur, currency, rate) {
+  const meta = cryptoMeta[currency] || cryptoMeta.BTC
+  const raw = Number(totalEur) / Number(rate)
+  const factor = 10 ** meta.displayDecimals
+  return (Math.ceil(raw * factor) / factor).toFixed(meta.displayDecimals)
+}
+
+function cryptoPaymentUri(currency, address, amount) {
+  if (currency === 'BTC') return `bitcoin:${address}?amount=${amount}`
+  if (currency === 'ETH') return `ethereum:${address}`
+  return address
+}
+
+async function answerTelegramCallback(callbackQueryId, text = '') {
+  if (!telegramApiBase || !callbackQueryId) return
+  try {
+    await fetch(`${telegramApiBase}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: callbackQueryId, text }),
+    })
+  } catch (error) {
+    console.error('Telegram callback answer failed:', error.message)
   }
 }
 
@@ -177,7 +238,20 @@ async function notifyAdmins(order, reason = 'Nuovo ordine') {
   const orders = await readJson(ordersFile, [])
   const storedOrder = orders.find(item => item.id === order.id)
   for (const adminId of adminIds) {
-    const message = await sendTelegramMessage(adminId, lines.join('\n'))
+    const message = await sendTelegramMessage(adminId, lines.filter(Boolean).join('\n'), {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: 'Pagato', callback_data: `cc:paid:${order.id}` },
+            { text: 'In lavoro', callback_data: `cc:processing:${order.id}` },
+          ],
+          [
+            { text: 'Completato', callback_data: `cc:completed:${order.id}` },
+            { text: 'Annulla', callback_data: `cc:cancelled:${order.id}` },
+          ],
+        ],
+      },
+    })
     if (message && storedOrder) {
       storedOrder.adminTelegramMessages = storedOrder.adminTelegramMessages || []
       storedOrder.adminTelegramMessages.push({ chatId: String(adminId), messageId: message.message_id })
@@ -388,6 +462,139 @@ function trackingInfo(trackingNumber, requestedProvider = '') {
   return { ...info, trackingNumber: value.replace(/\s+/g, ' ').trim() }
 }
 
+function isCryptoWalletBusy(order) {
+  if (order.payment !== 'crypto' || !order.cryptoWallet) return false
+  if (['completed', 'cancelled'].includes(order.status)) return false
+  return ['awaiting_crypto', 'paid_reported'].includes(order.paymentStatus || 'awaiting_crypto')
+}
+
+function cryptoOrderNeedsCheck(order) {
+  return order.payment === 'crypto' &&
+    order.cryptoWallet &&
+    order.cryptoExpectedAmount &&
+    !['paid_confirmed'].includes(order.paymentStatus || '') &&
+    !['completed', 'cancelled'].includes(order.status)
+}
+
+function paymentMatches(order, amount, timestampMs) {
+  const createdAt = Date.parse(order.createdAt) - 10 * 60 * 1000
+  if (Number.isFinite(timestampMs) && timestampMs < createdAt) return false
+  const expected = Number(order.cryptoExpectedAmount || 0)
+  return Number(amount) >= expected * (1 - cryptoPaymentTolerance)
+}
+
+async function findBtcPayment(order) {
+  const address = order.cryptoWallet
+  const txLists = await Promise.allSettled([
+    fetchJson(`https://mempool.space/api/address/${address}/txs`),
+    fetchJson(`https://mempool.space/api/address/${address}/txs/mempool`),
+  ])
+  const txs = txLists.flatMap(result => result.status === 'fulfilled' && Array.isArray(result.value) ? result.value : [])
+  for (const tx of txs) {
+    const confirmed = tx.status?.confirmed === true
+    if (btcMinConfirmations > 0 && !confirmed) continue
+    const timestampMs = confirmed && tx.status?.block_time ? Number(tx.status.block_time) * 1000 : Date.now()
+    const sats = (tx.vout || [])
+      .filter(output => String(output.scriptpubkey_address || '').toLowerCase() === address.toLowerCase())
+      .reduce((sum, output) => sum + Number(output.value || 0), 0)
+    const amount = sats / 1e8
+    if (paymentMatches(order, amount, timestampMs)) return { txHash: tx.txid, amount, confirmations: confirmed ? btcMinConfirmations : 0 }
+  }
+  return null
+}
+
+async function findEthPayment(order) {
+  const address = order.cryptoWallet
+  const data = await fetchJson(`https://eth.blockscout.com/api/v2/addresses/${address}/transactions`)
+  const txs = Array.isArray(data.items) ? data.items : []
+  for (const tx of txs) {
+    const to = tx.to?.hash || tx.to_address_hash || tx.to
+    if (String(to || '').toLowerCase() !== address.toLowerCase()) continue
+    if (tx.result && tx.result !== 'success') continue
+    const confirmations = Number(tx.confirmations || 0)
+    if (ethMinConfirmations > 0 && confirmations > 0 && confirmations < ethMinConfirmations) continue
+    const timestampMs = Date.parse(tx.timestamp || tx.block_timestamp || '')
+    const amount = Number(tx.value || 0) / 1e18
+    if (paymentMatches(order, amount, timestampMs)) return { txHash: tx.hash || tx.transaction_hash, amount, confirmations }
+  }
+  return null
+}
+
+async function findUsdtTrxPayment(order) {
+  const address = order.cryptoWallet
+  const data = await fetchJson(`https://api.trongrid.io/v1/accounts/${address}/transactions/trc20?contract_address=${usdtTronContract}&only_confirmed=true&limit=50`)
+  const txs = Array.isArray(data.data) ? data.data : []
+  for (const tx of txs) {
+    const to = tx.to || tx.to_address
+    if (String(to || '').toLowerCase() !== address.toLowerCase()) continue
+    const decimals = Number(tx.token_info?.decimals || 6)
+    const timestampMs = Number(tx.block_timestamp || tx.timestamp || 0)
+    const amount = Number(tx.value || 0) / (10 ** decimals)
+    if (paymentMatches(order, amount, timestampMs)) return { txHash: tx.transaction_id, amount, confirmations: tronMinConfirmations }
+  }
+  return null
+}
+
+async function findCryptoPayment(order) {
+  if (order.cryptoCurrency === 'BTC') return findBtcPayment(order)
+  if (order.cryptoCurrency === 'ETH') return findEthPayment(order)
+  if (order.cryptoCurrency === 'USDT') return findUsdtTrxPayment(order)
+  return null
+}
+
+async function confirmCryptoPayment(order, payment) {
+  order.paymentStatus = 'paid_confirmed'
+  if (order.status === 'new') order.status = 'processing'
+  order.cryptoPaidAt = new Date().toISOString()
+  order.cryptoPaidAmount = payment.amount
+  order.cryptoTxHash = payment.txHash || ''
+  order.updatedAt = order.cryptoPaidAt
+
+  if (order.notificationsEnabled !== false && order.customer?.id) {
+    await sendTelegramMessage(order.customer.id, [
+      `<b>Pagamento confermato per ordine ${escapeHtml(order.id)}.</b>`,
+      `${escapeHtml(order.cryptoCurrency)}: ${escapeHtml(order.cryptoPaidAmount)}`,
+      order.cryptoTxHash ? `TX: <code>${escapeHtml(order.cryptoTxHash)}</code>` : '',
+    ].filter(Boolean).join('\n'))
+  }
+
+  for (const adminId of adminIds) {
+    await sendTelegramMessage(adminId, [
+      `<b>Pagamento crypto confermato automaticamente</b>`,
+      `<b>Ordine:</b> ${escapeHtml(order.id)}`,
+      `<b>Importo:</b> ${escapeHtml(order.cryptoPaidAmount)} ${escapeHtml(order.cryptoCurrency)}`,
+      order.cryptoTxHash ? `<b>TX:</b> <code>${escapeHtml(order.cryptoTxHash)}</code>` : '',
+    ].filter(Boolean).join('\n'))
+  }
+}
+
+async function checkPendingCryptoPayments() {
+  const orders = await readJson(ordersFile, [])
+  let changed = false
+  for (const order of orders.filter(cryptoOrderNeedsCheck)) {
+    try {
+      const payment = await findCryptoPayment(order)
+      if (!payment) continue
+      await confirmCryptoPayment(order, payment)
+      changed = true
+    } catch (error) {
+      console.error(`Crypto payment check failed for ${order.id}:`, error.message)
+    }
+  }
+  if (changed) await writeJson(ordersFile, orders)
+}
+
+function publicCryptoWallets(orders = []) {
+  const busyWallets = new Set(orders.filter(isCryptoWalletBusy).map(order => String(order.cryptoWallet).toLowerCase()))
+  return Object.entries(cryptoWallets).map(([id, wallet]) => ({
+    id,
+    label: wallet.label,
+    network: wallet.network,
+    address: wallet.address,
+    busy: busyWallets.has(wallet.address.toLowerCase()),
+  }))
+}
+
 function autoDeliverDelayMs(provider) {
   const days = autoDeliverDays[provider] || autoDeliverDays.default
   return Math.max(1, Number(days) || autoDeliverDays.default) * 86400 * 1000
@@ -424,6 +631,37 @@ async function autoCompleteDeliveredOrders() {
   if (changed) await writeJson(ordersFile, orders)
 }
 
+async function applyAdminOrderAction(orderId, action) {
+  const orders = await readJson(ordersFile, [])
+  const order = orders.find(item => item.id === orderId)
+  if (!order) return null
+
+  if (action === 'paid') {
+    order.paymentStatus = 'paid_confirmed'
+    if (order.status === 'new') order.status = 'processing'
+  } else if (['processing', 'completed', 'cancelled'].includes(action)) {
+    order.status = action
+    if (action === 'completed' && !order.deliveredAt) order.deliveredAt = new Date().toISOString()
+  } else {
+    return null
+  }
+
+  order.updatedAt = new Date().toISOString()
+  await writeJson(ordersFile, orders)
+
+  if (order.notificationsEnabled !== false && order.customer?.id) {
+    const messages = {
+      paid: `Pagamento confermato per ordine <b>${escapeHtml(order.id)}</b>.`,
+      processing: `Ordine <b>${escapeHtml(order.id)}</b> in lavorazione.`,
+      completed: `Ordine <b>${escapeHtml(order.id)}</b> completato.`,
+      cancelled: `Ordine <b>${escapeHtml(order.id)}</b> annullato. Contattaci su Telegram per dettagli.`,
+    }
+    await sendTelegramMessage(order.customer.id, messages[action] || `Aggiornamento ordine <b>${escapeHtml(order.id)}</b>.`)
+  }
+
+  return order
+}
+
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
 
 app.get('/api/products', async (_req, res) => {
@@ -434,6 +672,11 @@ app.get('/api/products', async (_req, res) => {
 app.get('/api/site-content', async (_req, res) => {
   const content = normalizeSiteContent(await readJson(siteContentFile, defaultSiteContent))
   res.json(content)
+})
+
+app.get('/api/crypto-wallets', async (_req, res) => {
+  const orders = await readJson(ordersFile, [])
+  res.json(publicCryptoWallets(orders))
 })
 
 app.post('/api/orders', async (req, res) => {
@@ -454,6 +697,14 @@ app.post('/api/orders', async (req, res) => {
   const fees = payment === 'ccpp' ? ccppFee : 0
   const cryptoCurrency = String(req.body.cryptoCurrency || 'BTC')
   const cryptoPayment = payment === 'crypto' ? cryptoWallets[cryptoCurrency] || cryptoWallets.BTC : null
+  const rates = cryptoPayment ? await getCryptoRatesEur() : null
+  const cryptoExpectedAmount = cryptoPayment ? cryptoAmountForEur(subtotal + fees, cryptoCurrency, rates[cryptoCurrency]) : ''
+  if (cryptoPayment) {
+    const orders = await readJson(ordersFile, [])
+    if (publicCryptoWallets(orders).find(wallet => wallet.id === cryptoCurrency)?.busy) {
+      return res.status(409).json({ error: 'Wallet temporaneamente occupato. Scegli un altra valuta o CCPP.' })
+    }
+  }
   const requestedCourier = String(req.body.courier || 'UPS').trim()
   const courier = delivery === 'ship' && allowedCouriers.has(requestedCourier) ? requestedCourier : ''
 
@@ -468,6 +719,11 @@ app.post('/api/orders', async (req, res) => {
     cryptoCurrency: cryptoPayment?.label || '',
     cryptoNetwork: cryptoPayment?.network || '',
     cryptoWallet: cryptoPayment?.address || '',
+    cryptoExpectedAmount,
+    cryptoExpectedUnit: cryptoPayment?.label || '',
+    cryptoRateEur: cryptoPayment ? rates[cryptoCurrency] : 0,
+    cryptoRateAt: cryptoPayment ? new Date().toISOString() : '',
+    cryptoPaymentUri: cryptoPayment ? cryptoPaymentUri(cryptoCurrency, cryptoPayment.address, cryptoExpectedAmount) : '',
     customer,
     notificationsEnabled: req.body.notificationsEnabled !== false,
     trackingNumber: '',
@@ -505,6 +761,11 @@ app.get('/api/orders/:id/public', async (req, res) => {
     trackingNumber: order.trackingNumber || '',
     trackingProvider: order.trackingProvider || '',
     trackingUrl: order.trackingUrl || '',
+    cryptoExpectedAmount: order.cryptoExpectedAmount || '',
+    cryptoExpectedUnit: order.cryptoExpectedUnit || '',
+    cryptoWallet: order.cryptoWallet || '',
+    cryptoPaymentUri: order.cryptoPaymentUri || '',
+    cryptoTxHash: order.cryptoTxHash || '',
   })
 })
 
@@ -688,7 +949,11 @@ app.patch('/api/admin/orders/:id', requireAdmin, async (req, res) => {
   const order = orders.find(item => item.id === req.params.id)
   if (!order) return res.status(404).json({ error: 'Order not found' })
 
-  if (req.body.status !== undefined) order.status = String(req.body.status || order.status)
+  if (req.body.status !== undefined) {
+    const updated = await applyAdminOrderAction(req.params.id, String(req.body.status || order.status))
+    if (updated && ['processing', 'completed', 'cancelled'].includes(String(req.body.status))) return res.json(updated)
+    order.status = String(req.body.status || order.status)
+  }
   if (req.body.trackingNumber !== undefined) {
     const tracking = trackingInfo(String(req.body.trackingNumber || '').trim(), String(req.body.trackingProvider || order.courier || '').trim())
     order.trackingNumber = tracking.trackingNumber
@@ -710,6 +975,25 @@ app.patch('/api/admin/orders/:id', requireAdmin, async (req, res) => {
 app.post('/api/telegram/webhook', async (req, res) => {
   if (process.env.TELEGRAM_WEBHOOK_SECRET && req.get('x-telegram-bot-api-secret-token') !== process.env.TELEGRAM_WEBHOOK_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' })
+  }
+
+  const callback = req.body?.callback_query
+  if (callback) {
+    const fromId = String(callback.from?.id || '')
+    const data = String(callback.data || '')
+    if (!adminIds.has(fromId) || !data.startsWith('cc:')) {
+      await answerTelegramCallback(callback.id, 'Non autorizzato')
+      return res.json({ ok: true })
+    }
+
+    const [, action, ...idParts] = data.split(':')
+    const orderId = idParts.join(':')
+    const order = await applyAdminOrderAction(orderId, action)
+    await answerTelegramCallback(callback.id, order ? 'Aggiornato' : 'Ordine non trovato')
+    if (order) {
+      await sendTelegramMessage(callback.message?.chat?.id || fromId, `<b>${escapeHtml(order.id)}</b> aggiornato: ${escapeHtml(order.status)}${order.paymentStatus ? ` · ${escapeHtml(order.paymentStatus)}` : ''}`)
+    }
+    return res.json({ ok: true })
   }
 
   const message = req.body?.message
@@ -764,7 +1048,11 @@ app.get(/^\/(?!api\/).*/, (_req, res) => {
 app.listen(port, () => {
   console.log(`API listening on http://localhost:${port}`)
   autoCompleteDeliveredOrders().catch(error => console.error('Auto delivery check failed:', error.message))
+  checkPendingCryptoPayments().catch(error => console.error('Crypto payment check failed:', error.message))
   setInterval(() => {
     autoCompleteDeliveredOrders().catch(error => console.error('Auto delivery check failed:', error.message))
   }, autoDeliverCheckMs).unref()
+  setInterval(() => {
+    checkPendingCryptoPayments().catch(error => console.error('Crypto payment check failed:', error.message))
+  }, cryptoPaymentCheckMs).unref()
 })

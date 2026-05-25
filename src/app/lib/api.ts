@@ -20,6 +20,10 @@ export interface Order {
   cryptoCurrency?: string
   cryptoNetwork?: string
   cryptoWallet?: string
+  cryptoExpectedAmount?: string
+  cryptoExpectedUnit?: string
+  cryptoPaymentUri?: string
+  cryptoTxHash?: string
   customer?: {
     id?: string
     firstName?: string
@@ -50,6 +54,14 @@ export interface SiteContent {
   contacts: Array<{ label: string; value: string; url: string }>
 }
 
+export interface CryptoWalletAvailability {
+  id: string
+  label: string
+  network: string
+  address: string
+  busy: boolean
+}
+
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(url, {
     credentials: 'include',
@@ -66,8 +78,9 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
 export const api = {
   getProducts: () => request<Product[]>('/api/products'),
   getSiteContent: () => request<SiteContent>('/api/site-content'),
+  cryptoWallets: () => request<CryptoWalletAvailability[]>('/api/crypto-wallets'),
   createOrder: (payload: unknown) => request<Order>('/api/orders', { method: 'POST', body: JSON.stringify(payload) }),
-  publicOrder: (id: string) => request<Pick<Order, 'id' | 'status' | 'paymentStatus' | 'trackingNumber' | 'trackingProvider' | 'trackingUrl'>>(`/api/orders/${id}/public`),
+  publicOrder: (id: string) => request<Pick<Order, 'id' | 'status' | 'paymentStatus' | 'trackingNumber' | 'trackingProvider' | 'trackingUrl' | 'cryptoExpectedAmount' | 'cryptoExpectedUnit' | 'cryptoWallet' | 'cryptoPaymentUri' | 'cryptoTxHash'>>(`/api/orders/${id}/public`),
   reportCryptoPaid: (id: string, txHash = '') =>
     request<Order>(`/api/orders/${id}/crypto-paid`, { method: 'POST', body: JSON.stringify({ txHash }) }),
   me: () => request<{ user: null | { id: string; username?: string; firstName?: string; role?: string } }>('/api/auth/me'),

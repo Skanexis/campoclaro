@@ -42,6 +42,16 @@ Any Telegram sender added later must check `order.notificationsEnabled !== false
 
 Newsletter is a separate opt-in setting in the profile page. Admins can send a Telegram newsletter from `/admin`; the API sends only to users who enabled that setting.
 
+## Crypto payment checks
+
+Crypto orders lock an exact crypto amount at checkout using CoinGecko EUR rates, then the server checks public blockchain explorers every `CRYPTO_PAYMENT_CHECK_MS`:
+
+- BTC: mempool.space address transactions
+- ETH: Blockscout Ethereum address transactions
+- USDT TRC20: TronGrid TRC20 transfers
+
+When an incoming payment matches the wallet, amount, and order time window, the order becomes `paid_confirmed` automatically and Telegram notifications are sent. This is not a payment processor and uses public explorer APIs, so keep manual admin review available for edge cases or explorer outages.
+
 For tracking replies, point the Telegram bot webhook to:
 
 ```bash

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { motion } from 'motion/react'
-import { BarChart3, ExternalLink, LogOut, Mail, Package, Save, Send, ShoppingBag, Trash2, UserCheck } from 'lucide-react'
+import { BarChart3, Check, ExternalLink, LogOut, Mail, Package, Save, Send, ShoppingBag, Trash2, UserCheck, X } from 'lucide-react'
 import { Product } from './data'
 import { api, Order, SiteContent } from '../../lib/api'
 import { FALLBACK_SITE_CONTENT } from '../../hooks/useSiteContent'
@@ -12,7 +12,7 @@ declare global {
   }
 }
 
-type AdminTab = 'orders' | 'products' | 'contacts' | 'newsletter'
+type AdminTab = 'orders' | 'products' | 'filters' | 'contacts' | 'newsletter'
 
 const EMPTY_PRODUCT: Product & { active?: boolean; originalId?: string } = {
   id: '',
@@ -81,6 +81,14 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Annullato',
 }
 
+const STATUS_STYLES: Record<string, { color: string; bg: string; border: string }> = {
+  new: { color: '#F0C96A', bg: 'rgba(214,178,94,0.1)', border: 'rgba(214,178,94,0.32)' },
+  processing: { color: '#7DD3C7', bg: 'rgba(38,178,165,0.1)', border: 'rgba(38,178,165,0.28)' },
+  shipped: { color: '#8AB4F8', bg: 'rgba(80,130,220,0.1)', border: 'rgba(80,130,220,0.28)' },
+  completed: { color: '#6ECF95', bg: 'rgba(76,175,125,0.1)', border: 'rgba(76,175,125,0.28)' },
+  cancelled: { color: '#E57373', bg: 'rgba(229,115,115,0.1)', border: 'rgba(229,115,115,0.28)' },
+}
+
 const panel: CSSProperties = {
   background: 'linear-gradient(145deg, rgba(255,255,255,0.052), rgba(255,255,255,0.018) 52%, rgba(38,178,165,0.028))',
   border: '1px solid rgba(255,255,255,0.1)',
@@ -123,6 +131,29 @@ function Field({
         <input value={value} onChange={e => onChange(e.target.value)} style={common} />
       )}
     </label>
+  )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const style = STATUS_STYLES[status] || STATUS_STYLES.new
+  return (
+    <span style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      minHeight: 24,
+      padding: '3px 9px',
+      borderRadius: 999,
+      background: style.bg,
+      border: `1px solid ${style.border}`,
+      color: style.color,
+      fontFamily: "'Inter', sans-serif",
+      fontSize: '0.68rem',
+      letterSpacing: '0.06em',
+      textTransform: 'uppercase',
+      whiteSpace: 'nowrap',
+    }}>
+      {STATUS_LABELS[status] || status}
+    </span>
   )
 }
 
@@ -200,6 +231,7 @@ export function AdminPage() {
   const [newsletterTitle, setNewsletterTitle] = useState('')
   const [newsletterBody, setNewsletterBody] = useState('')
   const [newsletterSending, setNewsletterSending] = useState(false)
+  const [orderFilter, setOrderFilter] = useState<'all' | 'new' | 'paid' | 'shipped' | 'completed' | 'meetup'>('all')
 
   const loadAdmin = async () => {
     const [statsData, orderData, productData, contentData] = await Promise.all([api.adminStats(), api.adminOrders(), api.adminProducts(), api.adminSiteContent()])
@@ -222,6 +254,12 @@ export function AdminPage() {
   }, [])
 
   const sortedProducts = useMemo(() => [...products].sort((a, b) => a.name.localeCompare(b.name)), [products])
+  const filteredOrders = useMemo(() => orders.filter(order => {
+    if (orderFilter === 'all') return true
+    if (orderFilter === 'paid') return order.paymentStatus === 'paid_reported' || order.paymentStatus === 'paid_confirmed'
+    if (orderFilter === 'meetup') return order.delivery === 'meetup'
+    return order.status === orderFilter
+  }), [orders, orderFilter])
 
   const saveProduct = async () => {
     setMessage('')
@@ -299,6 +337,12 @@ export function AdminPage() {
     await loadAdmin()
   }
 
+  const quickOrderStatus = async (id: string, status: string) => {
+    setMessage('')
+    await api.updateOrderStatus(id, status)
+    await loadAdmin()
+  }
+
   const saveOrderTracking = async (id: string) => {
     await api.updateOrderTracking(id, trackingDrafts[id] || '')
     await loadAdmin()
@@ -369,6 +413,7 @@ export function AdminPage() {
           {[
             { id: 'orders', label: 'Ordini' },
             { id: 'products', label: 'Catalogo' },
+            { id: 'filters', label: 'Filtri' },
             { id: 'contacts', label: 'Contatti' },
             { id: 'newsletter', label: 'Newsletter' },
           ].map(item => (
@@ -380,13 +425,44 @@ export function AdminPage() {
 
         {tab === 'orders' && (
           <motion.div className="admin-list" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ ...panel, overflow: 'hidden' }}>
-            {orders.length === 0 ? (
+            <div style={{ position: 'sticky', top: 84, zIndex: 5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '12px 14px', background: 'rgba(5,5,5,0.86)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(18px)' }}>
+              {[
+                ['all', 'Tutti'],
+                ['new', 'Nuovi'],
+                ['paid', 'Pagati'],
+                ['shipped', 'Spediti'],
+                ['completed', 'Completati'],
+                ['meetup', 'Meetup'],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setOrderFilter(value as typeof orderFilter)}
+                  style={{
+                    padding: '7px 11px',
+                    borderRadius: 999,
+                    background: orderFilter === value ? 'rgba(214,178,94,0.14)' : 'rgba(255,255,255,0.025)',
+                    border: orderFilter === value ? '1px solid rgba(214,178,94,0.42)' : '1px solid rgba(255,255,255,0.075)',
+                    color: orderFilter === value ? '#D6B25E' : 'rgba(245,245,245,0.54)',
+                    cursor: 'pointer',
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: '0.72rem',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {filteredOrders.length === 0 ? (
               <div className="admin-empty-state" style={{ padding: 32, color: 'rgba(245,245,245,0.38)', fontFamily: "'Inter', sans-serif" }}>Nessun ordine.</div>
-            ) : orders.map(order => (
-              <div key={order.id} className="admin-list-row" style={{ padding: 18, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr auto', gap: 18, alignItems: 'start' }} className="admin-row">
+            ) : filteredOrders.map(order => (
+              <div key={order.id} className="admin-list-row" style={{ padding: '13px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 1.1fr auto', gap: 14, alignItems: 'start' }} className="admin-row">
                   <div>
-                    <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#D6B25E', marginBottom: 5 }}>{order.id}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 5 }}>
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace", color: '#D6B25E' }}>{order.id}</span>
+                      <StatusBadge status={order.status} />
+                    </div>
                     <div style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.35)', fontSize: '0.76rem' }}>
                       {new Date(order.createdAt).toLocaleString('it-IT')} · {order.delivery} · {order.payment} · notifiche {order.notificationsEnabled === false ? 'off' : 'on'}
                     </div>
@@ -454,6 +530,12 @@ export function AdminPage() {
                     <select value={order.status} onChange={e => updateOrderStatus(order.id, e.target.value)} style={{ background: '#111', color: '#F5F5F5', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '8px 10px' }}>
                       {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
+                    <button type="button" title="Completato" onClick={() => quickOrderStatus(order.id, 'completed')} style={{ width: 34, height: 34, borderRadius: 6, border: '1px solid rgba(76,175,125,0.28)', background: 'rgba(76,175,125,0.1)', color: '#6ECF95', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Check size={15} />
+                    </button>
+                    <button type="button" title="Annulla" onClick={() => quickOrderStatus(order.id, 'cancelled')} style={{ width: 34, height: 34, borderRadius: 6, border: '1px solid rgba(229,115,115,0.28)', background: 'rgba(229,115,115,0.1)', color: '#E57373', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <X size={15} />
+                    </button>
                     <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#D6B25E' }}>€{order.total}</div>
                   </div>
                 </div>
@@ -587,6 +669,50 @@ export function AdminPage() {
               </div>
               {message && <div style={{ marginTop: 14, color: '#D6B25E', fontFamily: "'Inter', sans-serif", fontSize: '0.8rem' }}>{message}</div>}
             </div>
+          </motion.div>
+        )}
+
+        {tab === 'filters' && (
+          <motion.div className="admin-form-panel" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ ...panel, padding: 18 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 18 }}>
+              <div>
+                <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.35)', marginBottom: 6 }}>
+                  Filtri catalogo
+                </div>
+                <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.82rem', color: 'rgba(245,245,245,0.44)', lineHeight: 1.55 }}>
+                  Crea qui le categorie filtro visibili nel catalogo. Poi assegnale ai prodotti nella scheda Catalogo.
+                </div>
+              </div>
+              <button
+                onClick={() => setSiteContent(p => ({ ...p, productFilters: [...p.productFilters, `Filtro ${p.productFilters.length + 1}`] }))}
+                style={{ padding: '10px 14px', background: 'rgba(214,178,94,0.1)', border: '1px solid rgba(214,178,94,0.32)', borderRadius: 6, color: '#D6B25E', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                + Nuovo filtro
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gap: 12 }}>
+              {siteContent.productFilters.length === 0 ? (
+                <div className="admin-empty-state" style={{ padding: 24, borderRadius: 8, color: 'rgba(245,245,245,0.38)', fontFamily: "'Inter', sans-serif" }}>
+                  Nessun filtro. Crea il primo filtro per organizzare il catalogo.
+                </div>
+              ) : siteContent.productFilters.map((filter, i) => (
+                <div key={i} className="admin-contact-card admin-filter-row" style={{ ...panel, padding: 14, display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'end' }}>
+                  <Field label={`Filtro ${i + 1}`} value={filter} onChange={v => updateFilterName(i, v)} />
+                  <button
+                    onClick={() => removeFilter(i)}
+                    style={{ height: 39, padding: '0 12px', background: 'rgba(229,115,115,0.08)', color: '#E57373', border: '1px solid rgba(229,115,115,0.22)', borderRadius: 6, cursor: 'pointer' }}
+                  >
+                    Rimuovi
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={saveSiteContent} style={{ marginTop: 18, display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: 'linear-gradient(135deg, #D6B25E, #F0C96A)', color: '#050505', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>
+              <Save size={16} /> Salva filtri
+            </button>
+            {message && <div style={{ marginTop: 14, color: '#D6B25E', fontFamily: "'Inter', sans-serif", fontSize: '0.8rem' }}>{message}</div>}
           </motion.div>
         )}
 
@@ -739,6 +865,7 @@ export function AdminPage() {
           .admin-stats,
           .admin-row,
           .admin-products,
+          .admin-filter-row,
           .admin-form {
             grid-template-columns: 1fr !important;
           }

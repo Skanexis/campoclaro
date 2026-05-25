@@ -60,7 +60,7 @@ function FloatingInput({
   const hasValue = value.length > 0
 
   return (
-    <div style={{ position: 'relative', marginBottom: 20 }}>
+    <div style={{ position: 'relative', marginBottom: 12 }}>
       <input
         type={type}
         value={value}
@@ -69,13 +69,13 @@ function FloatingInput({
         onBlur={() => setFocused(false)}
         style={{
           width: '100%',
-          padding: '18px 14px 8px',
+          padding: '15px 12px 7px',
           background: 'rgba(255,255,255,0.03)',
           border: `1px solid ${focused ? 'rgba(214,178,94,0.5)' : 'rgba(255,255,255,0.08)'}`,
           borderRadius: 6,
           color: '#F5F5F5',
           fontFamily: "'Inter', sans-serif",
-          fontSize: '0.9rem',
+          fontSize: '0.82rem',
           outline: 'none',
           transition: 'border-color 0.2s ease',
           boxSizing: 'border-box' as const,
@@ -84,7 +84,7 @@ function FloatingInput({
       <label style={{
         position: 'absolute',
         left: 14,
-        top: focused || hasValue ? 6 : 14,
+        top: focused || hasValue ? 5 : 12,
         fontFamily: "'Inter', sans-serif",
         fontSize: focused || hasValue ? '0.65rem' : '0.85rem',
         letterSpacing: focused || hasValue ? '0.1em' : '0.02em',
@@ -128,7 +128,7 @@ function DeliveryCard({
       onClick={onSelect}
       style={{
         flex: 1,
-        padding: '16px',
+        padding: '12px',
         background: selected ? 'rgba(214,178,94,0.07)' : 'rgba(255,255,255,0.02)',
         border: selected ? '1px solid rgba(214,178,94,0.4)' : '1px solid rgba(255,255,255,0.07)',
         borderRadius: 8,
@@ -137,7 +137,7 @@ function DeliveryCard({
         transition: 'all 0.2s ease',
       }}
     >
-      <div style={{ color: selected ? '#D6B25E' : 'rgba(245,245,245,0.4)', marginBottom: 8 }}>
+      <div style={{ color: selected ? '#D6B25E' : 'rgba(245,245,245,0.4)', marginBottom: 5 }}>
         {info.icon}
       </div>
       <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: '0.9rem', fontWeight: 700, color: selected ? '#F5F5F5' : 'rgba(245,245,245,0.6)', marginBottom: 4 }}>
@@ -170,7 +170,7 @@ function PaymentCard({
       onClick={onSelect}
       style={{
         width: '100%',
-        padding: '16px 18px',
+        padding: '12px 14px',
         background: selected ? 'rgba(214,178,94,0.07)' : 'rgba(255,255,255,0.02)',
         border: selected ? '1px solid rgba(214,178,94,0.4)' : '1px solid rgba(255,255,255,0.07)',
         borderRadius: 8,
@@ -220,9 +220,10 @@ export function CartDrawer() {
   const [orderError, setOrderError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [telegramCustomer, setTelegramCustomer] = useState<TelegramCustomer | null>(null)
-  const [lastOrder, setLastOrder] = useState<{ id: string; trackingNumber?: string; trackingProvider?: string; trackingUrl?: string; paymentStatus?: string } | null>(null)
+  const [lastOrder, setLastOrder] = useState<{ id: string; trackingNumber?: string; trackingProvider?: string; trackingUrl?: string; paymentStatus?: string; cryptoExpectedAmount?: string; cryptoExpectedUnit?: string; cryptoWallet?: string; cryptoPaymentUri?: string; cryptoTxHash?: string } | null>(null)
   const [txHash, setTxHash] = useState('')
   const [paymentReported, setPaymentReported] = useState(false)
+  const [walletAvailability, setWalletAvailability] = useState<Record<string, { busy: boolean; address: string; network: string; label: string }>>({})
 
   const [address, setAddress] = useState({ via: '', city: '', cap: '', notes: '' })
   const itemKey = (item: { id: string; weight: string; strain?: string }) => `${item.id}-${item.weight}-${item.strain || 'default'}`
@@ -230,6 +231,7 @@ export function CartDrawer() {
   const orderTotal = total + ccppFee
   const selectedCrypto = CRYPTO_WALLETS[cryptoCurrency]
   const botName = import.meta.env.VITE_TELEGRAM_BOT_USERNAME
+  const selectedWalletBusy = walletAvailability[cryptoCurrency]?.busy === true
 
   useEffect(() => {
     window.onCheckoutTelegramAuth = async user => {
@@ -248,6 +250,22 @@ export function CartDrawer() {
       .then(({ user }) => setTelegramCustomer(user))
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!isOpen) return
+    api.cryptoWallets()
+      .then(wallets => {
+        const next = Object.fromEntries(wallets.map(wallet => [wallet.id, wallet]))
+        setWalletAvailability(next)
+        const currentBusy = next[cryptoCurrency]?.busy === true
+        if (currentBusy) {
+          const available = wallets.find(wallet => !wallet.busy)
+          if (available) setCryptoCurrency(available.id as CryptoCurrency)
+          else setPayMethod('ccpp')
+        }
+      })
+      .catch(() => {})
+  }, [isOpen, cryptoCurrency])
 
   useEffect(() => {
     if (!botName || !isOpen || telegramCustomer || document.getElementById('telegram-checkout-script')) return
@@ -286,11 +304,29 @@ export function CartDrawer() {
       setOrderError('Compila indirizzo, città e CAP per la spedizione.')
       return
     }
+    if (delivery === 'ship' && payMethod === 'crypto' && selectedWalletBusy) {
+      setOrderError('Wallet occupato. Scegli una valuta disponibile o CCPP.')
+      return
+    }
     setStep(delivery === 'meetup' ? 'confirm' : 'payment')
   }
   const handleConfirm = () => setStep('confirm')
+  const handlePaymentConfirm = () => {
+    setOrderError('')
+    if (delivery === 'ship' && payMethod === 'crypto' && selectedWalletBusy) {
+      setOrderError('Wallet occupato. Scegli una valuta disponibile o CCPP.')
+      return
+    }
+    setStep('confirm')
+  }
   const copyCryptoAddress = () => {
-    navigator.clipboard?.writeText(selectedCrypto.address).catch(() => {})
+    navigator.clipboard?.writeText(lastOrder?.cryptoWallet || selectedCrypto.address).catch(() => {})
+  }
+  const copyCryptoAmount = () => {
+    navigator.clipboard?.writeText(lastOrder?.cryptoExpectedAmount || '').catch(() => {})
+  }
+  const copyCryptoUri = () => {
+    navigator.clipboard?.writeText(lastOrder?.cryptoPaymentUri || '').catch(() => {})
   }
 
   const handlePlaceOrder = async () => {
@@ -714,24 +750,29 @@ export function CartDrawer() {
                           {(Object.keys(CRYPTO_WALLETS) as CryptoCurrency[]).map(currency => {
                             const selected = cryptoCurrency === currency
                             const wallet = CRYPTO_WALLETS[currency]
+                            const busy = walletAvailability[currency]?.busy === true
                             return (
                               <button
                                 key={currency}
                                 type="button"
-                                onClick={() => setCryptoCurrency(currency)}
+                                disabled={busy}
+                                onClick={() => !busy && setCryptoCurrency(currency)}
                                 style={{
                                   padding: '11px 8px',
-                                  background: selected ? 'rgba(214,178,94,0.1)' : 'rgba(255,255,255,0.025)',
-                                  border: selected ? '1px solid rgba(214,178,94,0.45)' : '1px solid rgba(255,255,255,0.07)',
+                                  background: busy ? 'rgba(229,115,115,0.055)' : selected ? 'rgba(214,178,94,0.1)' : 'rgba(255,255,255,0.025)',
+                                  border: busy ? '1px solid rgba(229,115,115,0.22)' : selected ? '1px solid rgba(214,178,94,0.45)' : '1px solid rgba(255,255,255,0.07)',
                                   borderRadius: 6,
-                                  color: selected ? '#D6B25E' : 'rgba(245,245,245,0.58)',
-                                  cursor: 'pointer',
+                                  color: busy ? '#E57373' : selected ? '#D6B25E' : 'rgba(245,245,245,0.58)',
+                                  cursor: busy ? 'not-allowed' : 'pointer',
                                   textAlign: 'center',
                                   fontFamily: "'Inter', sans-serif",
+                                  opacity: busy ? 0.72 : 1,
                                 }}
                               >
                                 <div style={{ fontWeight: 700, fontSize: '0.82rem' }}>{wallet.label}</div>
-                                <div style={{ fontSize: '0.66rem', marginTop: 3, color: 'rgba(245,245,245,0.34)' }}>{wallet.network}</div>
+                                <div style={{ fontSize: '0.66rem', marginTop: 3, color: busy ? '#E57373' : 'rgba(245,245,245,0.34)' }}>
+                                  {busy ? 'Busy' : wallet.network}
+                                </div>
                               </button>
                             )
                           })}
@@ -918,35 +959,49 @@ export function CartDrawer() {
                     </div>
                     <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.85rem', color: 'rgba(245,245,245,0.4)', lineHeight: 1.6, maxWidth: 320, margin: '0 auto' }}>
                       {delivery === 'ship' && payMethod === 'crypto'
-                        ? `Invia €${orderTotal} equivalenti in ${selectedCrypto.label} al wallet indicato. L'ordine resta in attesa fino alla conferma del pagamento.`
+                        ? `Invia esattamente ${lastOrder?.cryptoExpectedAmount || ''} ${lastOrder?.cryptoExpectedUnit || selectedCrypto.label}. Il sistema verifica automaticamente la blockchain.`
                         : 'Il tuo ordine è stato registrato. Riceverai conferma a breve.'}
                     </div>
                     {delivery === 'ship' && payMethod === 'crypto' && (
-                      <button
-                        type="button"
-                        onClick={copyCryptoAddress}
-                        style={{
-                          width: 'min(340px, 100%)',
-                          margin: '18px auto 0',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 10,
-                          padding: '11px 12px',
-                          background: 'rgba(255,255,255,0.03)',
-                          border: '1px solid rgba(214,178,94,0.22)',
-                          borderRadius: 6,
-                          color: '#F5F5F5',
-                          cursor: 'pointer',
-                          fontFamily: "'JetBrains Mono', monospace",
-                          fontSize: '0.72rem',
-                          wordBreak: 'break-all',
-                          textAlign: 'left',
-                        }}
-                      >
-                        <span>{selectedCrypto.address}</span>
-                        <Copy size={14} style={{ flexShrink: 0, color: '#D6B25E' }} />
-                      </button>
+                      <div style={{ width: 'min(360px, 100%)', margin: '18px auto 0', display: 'grid', gap: 8 }}>
+                        {[
+                          { label: 'Importo', value: `${lastOrder?.cryptoExpectedAmount || ''} ${lastOrder?.cryptoExpectedUnit || selectedCrypto.label}`, onClick: copyCryptoAmount },
+                          { label: 'Wallet', value: lastOrder?.cryptoWallet || selectedCrypto.address, onClick: copyCryptoAddress },
+                          ...(lastOrder?.cryptoPaymentUri ? [{ label: 'Payment URI', value: lastOrder.cryptoPaymentUri, onClick: copyCryptoUri }] : []),
+                        ].map(item => (
+                          <button
+                            key={item.label}
+                            type="button"
+                            onClick={item.onClick}
+                            style={{
+                              width: '100%',
+                              display: 'grid',
+                              gridTemplateColumns: '70px 1fr auto',
+                              alignItems: 'center',
+                              gap: 10,
+                              padding: '10px 12px',
+                              background: 'rgba(255,255,255,0.03)',
+                              border: '1px solid rgba(214,178,94,0.22)',
+                              borderRadius: 6,
+                              color: '#F5F5F5',
+                              cursor: 'pointer',
+                              fontFamily: "'JetBrains Mono', monospace",
+                              fontSize: '0.7rem',
+                              wordBreak: 'break-all',
+                              textAlign: 'left',
+                            }}
+                          >
+                            <span style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.36)', fontSize: '0.68rem' }}>{item.label}</span>
+                            <span>{item.value}</span>
+                            <Copy size={14} style={{ flexShrink: 0, color: '#D6B25E' }} />
+                          </button>
+                        ))}
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: lastOrder?.paymentStatus === 'paid_confirmed' ? '#6ECF95' : 'rgba(245,245,245,0.38)', lineHeight: 1.45 }}>
+                          {lastOrder?.paymentStatus === 'paid_confirmed'
+                            ? `Pagamento rilevato automaticamente${lastOrder.cryptoTxHash ? ` · TX ${lastOrder.cryptoTxHash.slice(0, 12)}...` : ''}`
+                            : 'Controllo automatico attivo. Non serve inviare screenshot.'}
+                        </div>
+                      </div>
                     )}
                     {delivery === 'ship' && payMethod === 'crypto' && !paymentReported && (
                       <div style={{ width: 'min(340px, 100%)', margin: '16px auto 0', textAlign: 'left' }}>
@@ -1018,7 +1073,7 @@ export function CartDrawer() {
                 <motion.button
                   whileHover={{ scale: 1.02, boxShadow: '0 6px 24px rgba(214,178,94,0.2)' }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={step === 'cart' ? handleCheckout : step === 'payment' ? handleConfirm : handlePlaceOrder}
+                  onClick={step === 'cart' ? handleCheckout : step === 'payment' ? handlePaymentConfirm : handlePlaceOrder}
                   style={{
                     width: '100%',
                     padding: '14px',

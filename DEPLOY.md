@@ -41,7 +41,7 @@ Create an empty private repository on GitHub, GitLab, or another Git server.
 Connect it:
 
 ```bash
-git remote add origin YOUR_GIT_REPO_URL
+git remote add origin https://github.com/Skanexis/campoclaro.git
 git branch -M main
 git push -u origin main
 ```
@@ -95,7 +95,7 @@ Use `/opt` to keep projects organized:
 ```bash
 mkdir -p /opt
 cd /opt
-git clone YOUR_GIT_REPO_URL campoclaro
+git clone https://github.com/Skanexis/campoclaro.git campoclaro
 cd /opt/campoclaro
 ```
 
