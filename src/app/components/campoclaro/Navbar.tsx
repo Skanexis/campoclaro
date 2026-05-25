@@ -128,7 +128,7 @@ export function Navbar() {
           </div>
 
           {/* Actions */}
-          <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 'clamp(12px, 3vw, 20px)', alignItems: 'center' }}>
             <Link to="/profilo" style={{
               width: 34,
               height: 34,
@@ -141,7 +141,7 @@ export function Navbar() {
               justifyContent: 'center',
               transition: 'color 0.2s, background 0.2s, border-color 0.2s, box-shadow 0.2s',
             }}
-              className="hidden md:flex"
+              className="flex"
               onMouseEnter={e => {
                 e.currentTarget.style.color = '#050505'
                 e.currentTarget.style.background = '#D6B25E'

@@ -89,6 +89,7 @@ export const api = {
     request<{ user: { id: string; firstName?: string; lastName?: string; username?: string; photoUrl?: string } }>('/api/customer/telegram', { method: 'POST', body: JSON.stringify(payload) }),
   customerMe: () =>
     request<{ user: null | { id: string; firstName?: string; lastName?: string; username?: string; photoUrl?: string } }>('/api/customer/me'),
+  customerOrders: () => request<Order[]>('/api/customer/orders'),
   devLogin: () => request('/api/auth/dev-login', { method: 'POST', body: JSON.stringify({}) }),
   logout: () => request('/api/auth/logout', { method: 'POST', body: JSON.stringify({}) }),
   newsletterPreference: () => request<{ enabled: boolean }>('/api/customer/newsletter'),

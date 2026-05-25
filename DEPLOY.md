@@ -132,6 +132,7 @@ Notes:
 - If another project already uses `3101`, choose another local port, for example `3102`, and update the Nginx config later.
 - `ADMIN_TELEGRAM_IDS` are numeric Telegram user IDs, comma-separated.
 - `VITE_TELEGRAM_BOT_USERNAME` is baked into the frontend during Docker build, so rebuild after changing it.
+- Telegram Login also requires the site domain to be linked to this bot. In `@BotFather`, select the bot, send `/setdomain`, and set `campoclaro.eu` before testing login on production.
 
 ## 6. Start Docker App
 

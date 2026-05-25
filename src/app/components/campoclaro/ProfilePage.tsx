@@ -1,46 +1,24 @@
-import { useEffect, useState } from 'react'
+import { type ReactElement, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { motion, AnimatePresence } from 'motion/react'
 import { User, Package, Settings, ChevronRight, Clock, Check, Truck, Shield } from 'lucide-react'
 import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
-import { api } from '../../lib/api'
+import { api, Order } from '../../lib/api'
 
 type SidebarSection = 'profile' | 'orders' | 'settings' | 'admin'
 
-const MOCK_ORDERS = [
-  {
-    id: 'CC-2026-0042',
-    date: '21 Mag 2026',
-    items: [{ name: 'Noir Venezia', weight: '2g', price: 22 }, { name: 'Perla Bianca', weight: '1g', price: 14 }],
-    total: 36,
-    status: 'completed' as const,
-    delivery: 'Spedizione',
-  },
-  {
-    id: 'CC-2026-0038',
-    date: '12 Mag 2026',
-    items: [{ name: 'Ombra Dorata', weight: '5g', price: 80 }],
-    total: 80,
-    status: 'shipped' as const,
-    delivery: 'Spedizione',
-    trackingNumber: 'CCMOCKTRACK123',
-    trackingProvider: 'Universal Free',
-    trackingUrl: 'https://theparceltracker.com/',
-  },
-  {
-    id: 'CC-2026-0031',
-    date: '03 Mag 2026',
-    items: [{ name: 'Luna Scura', weight: '2g', price: 28 }, { name: 'Cristallo Alpino', weight: '1g', price: 13 }],
-    total: 41,
-    status: 'pending' as const,
-    delivery: 'Ritiro',
-  },
-]
+declare global {
+  interface Window {
+    onProfileTelegramAuth?: (user: unknown) => void
+  }
+}
 
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: ReactElement }> = {
   completed: { label: 'Completato', color: '#4CAF7D', icon: <Check size={12} /> },
   shipped: { label: 'In Transito', color: '#D6B25E', icon: <Truck size={12} /> },
-  pending: { label: 'In Attesa', color: 'rgba(245,245,245,0.4)', icon: <Clock size={12} /> },
+  processing: { label: 'In Lavoro', color: '#D6B25E', icon: <Clock size={12} /> },
+  new: { label: 'In Attesa', color: 'rgba(245,245,245,0.4)', icon: <Clock size={12} /> },
+  cancelled: { label: 'Annullato', color: '#E57373', icon: <Clock size={12} /> },
 }
 
 function TransitBadge({ label }: { label: string }) {
@@ -55,10 +33,10 @@ function TransitBadge({ label }: { label: string }) {
   )
 }
 
-function OrderTimeline({ order }: { order: typeof MOCK_ORDERS[0] }) {
+function OrderTimeline({ order }: { order: Order }) {
   const steps = [
     { label: 'Ordine Ricevuto', done: true },
-    { label: 'Confermato', done: order.status !== 'pending' },
+    { label: 'Confermato', done: order.status !== 'new' && order.status !== 'cancelled' },
     { label: 'In Transito', done: order.status === 'shipped' || order.status === 'completed' },
     { label: 'Consegnato', done: order.status === 'completed' },
   ]
@@ -105,9 +83,9 @@ function OrderTimeline({ order }: { order: typeof MOCK_ORDERS[0] }) {
   )
 }
 
-function OrderCard({ order }: { order: typeof MOCK_ORDERS[0] }) {
+function OrderCard({ order }: { order: Order }) {
   const [expanded, setExpanded] = useState(false)
-  const status = STATUS_CONFIG[order.status]
+  const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.new
 
   return (
     <motion.div
@@ -140,7 +118,7 @@ function OrderCard({ order }: { order: typeof MOCK_ORDERS[0] }) {
               {order.id}
             </div>
             <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.3)' }}>
-              {order.date} · {order.delivery}
+              {new Date(order.createdAt).toLocaleDateString('it-IT')} · {order.delivery === 'ship' ? 'Spedizione' : 'Meetup'}
             </div>
           </div>
         </div>
@@ -190,7 +168,7 @@ function OrderCard({ order }: { order: typeof MOCK_ORDERS[0] }) {
                       {item.name} · {item.weight}
                     </span>
                     <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.82rem', color: '#D6B25E' }}>
-                      €{item.price}
+                      €{Number(item.price) * Number(item.quantity || 1)}
                     </span>
                   </div>
                 ))}
@@ -222,35 +200,103 @@ function OrderCard({ order }: { order: typeof MOCK_ORDERS[0] }) {
   )
 }
 
+function ProfileTelegramLogin({ onReady }: { onReady: () => Promise<void> }) {
+  const [error, setError] = useState('')
+  const botName = import.meta.env.VITE_TELEGRAM_BOT_USERNAME
+
+  useEffect(() => {
+    window.onProfileTelegramAuth = async user => {
+      setError('')
+      try {
+        await api.customerTelegramLogin(user)
+        await onReady()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Accesso Telegram non riuscito')
+      }
+    }
+
+    if (!botName || document.getElementById('telegram-profile-script')) return
+    const slot = document.getElementById('telegram-profile-slot')
+    if (!slot) return
+    const script = document.createElement('script')
+    script.id = 'telegram-profile-script'
+    script.src = 'https://telegram.org/js/telegram-widget.js?22'
+    script.async = true
+    script.setAttribute('data-telegram-login', botName)
+    script.setAttribute('data-size', 'large')
+    script.setAttribute('data-userpic', 'false')
+    script.setAttribute('data-request-access', 'write')
+    script.setAttribute('data-onauth', 'onProfileTelegramAuth(user)')
+    slot.appendChild(script)
+
+    return () => {
+      delete window.onProfileTelegramAuth
+    }
+  }, [botName, onReady])
+
+  return (
+    <div style={{ padding: '20px', background: 'rgba(214,178,94,0.04)', border: '1px solid rgba(214,178,94,0.14)', borderRadius: 8, marginBottom: 20 }}>
+      <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: '1rem', fontWeight: 700, color: '#F5F5F5', marginBottom: 6 }}>
+        Accedi con Telegram
+      </div>
+      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.45)', lineHeight: 1.5, marginBottom: 14 }}>
+        Accedi per visualizzare ordini, tracking e preferenze reali.
+      </div>
+      {botName ? (
+        <div id="telegram-profile-slot" style={{ minHeight: 44 }} />
+      ) : (
+        <div style={{ fontSize: '0.78rem', color: '#E57373' }}>Configura VITE_TELEGRAM_BOT_USERNAME e ricostruisci il frontend.</div>
+      )}
+      {error && <div style={{ marginTop: 10, color: '#E57373', fontSize: '0.78rem' }}>{error}</div>}
+    </div>
+  )
+}
+
 export function ProfilePage() {
   const [active, setActive] = useState<SidebarSection>('profile')
   const [user, setUser] = useState<null | { id: string; username?: string; firstName?: string; role?: string }>(null)
+  const [customerSignedIn, setCustomerSignedIn] = useState(false)
+  const [orders, setOrders] = useState<Order[]>([])
   const { notificationsEnabled, setNotificationsEnabled } = useNotificationPreferences()
   const [confirmOrders, setConfirmOrders] = useState(true)
   const [newsletterEnabled, setNewsletterEnabled] = useState(false)
   const [newsletterMessage, setNewsletterMessage] = useState('')
   const isAdmin = user?.role === 'admin'
 
+  const loadDashboard = async () => {
+    const [customerResult, adminResult, ordersResult, newsletterResult] = await Promise.allSettled([
+      api.customerMe(),
+      api.me(),
+      api.customerOrders(),
+      api.newsletterPreference(),
+    ])
+    const customer = customerResult.status === 'fulfilled' ? customerResult.value.user : null
+    const admin = adminResult.status === 'fulfilled' ? adminResult.value.user : null
+    setCustomerSignedIn(Boolean(customer))
+    setUser(customer ? { ...customer, role: admin?.role } : admin)
+    setOrders(ordersResult.status === 'fulfilled' ? ordersResult.value : [])
+    setNewsletterEnabled(newsletterResult.status === 'fulfilled' ? newsletterResult.value.enabled : false)
+  }
+
   useEffect(() => {
     let cancelled = false
-    api.me()
-      .then(({ user }) => {
-        if (!cancelled) setUser(user)
-      })
-      .catch(() => {
-        if (!cancelled) setUser(null)
-      })
-    api.newsletterPreference()
-      .then(({ enabled }) => {
-        if (!cancelled) setNewsletterEnabled(enabled)
-      })
-      .catch(() => {
-        if (!cancelled) setNewsletterEnabled(false)
-      })
+    loadDashboard().catch(() => {
+      if (!cancelled) {
+        setUser(null)
+        setCustomerSignedIn(false)
+        setOrders([])
+      }
+    })
     return () => {
       cancelled = true
     }
   }, [])
+
+  const orderStats = useMemo(() => ({
+    total: orders.reduce((sum, order) => sum + Number(order.total || 0), 0),
+    completed: orders.filter(order => order.status === 'completed').length,
+    shipping: orders.filter(order => order.status === 'shipped').length,
+  }), [orders])
 
   const toggleNewsletter = async () => {
     const next = !newsletterEnabled
@@ -377,6 +423,7 @@ export function ProfilePage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.15 }}
           >
+            {!customerSignedIn && <ProfileTelegramLogin onReady={loadDashboard} />}
             <AnimatePresence mode="wait">
               {/* PROFILE */}
               {active === 'profile' && (
@@ -400,9 +447,9 @@ export function ProfilePage() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                       {[
                         { label: 'Username', value: user?.username ? `@${user.username}` : user?.firstName || 'Utente' },
-                        { label: 'Stato', value: isAdmin ? 'Admin' : 'Membro Attivo' },
-                        { label: 'Membro dal', value: 'Gen 2026' },
-                        { label: 'Ordini Totali', value: '3' },
+                        { label: 'Stato', value: customerSignedIn ? (isAdmin ? 'Admin' : 'Membro Attivo') : 'Non autenticato' },
+                        { label: 'Telegram ID', value: customerSignedIn ? user?.id || '-' : '-' },
+                        { label: 'Ordini Totali', value: customerSignedIn ? String(orders.length) : '-' },
                       ].map(field => (
                         <div key={field.label} style={{
                           padding: '12px 14px',
@@ -424,9 +471,9 @@ export function ProfilePage() {
                   {/* Stats */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                     {[
-                      { label: 'Spesa Totale', value: '€157' },
-                      { label: 'Ordini Completati', value: '2' },
-                      { label: 'In Transito', value: '1' },
+                      { label: 'Spesa Totale', value: customerSignedIn ? `€${orderStats.total}` : '-' },
+                      { label: 'Ordini Completati', value: customerSignedIn ? String(orderStats.completed) : '-' },
+                      { label: 'In Transito', value: customerSignedIn ? String(orderStats.shipping) : '-' },
                     ].map(stat => (
                       <div
                         key={stat.label}
@@ -462,7 +509,11 @@ export function ProfilePage() {
                   <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 20 }}>
                     Storico Ordini
                   </div>
-                  {MOCK_ORDERS.map(order => (
+                  {!customerSignedIn ? (
+                    <div style={{ color: 'rgba(245,245,245,0.4)', fontSize: '0.84rem' }}>Accedi con Telegram per vedere gli ordini.</div>
+                  ) : orders.length === 0 ? (
+                    <div style={{ color: 'rgba(245,245,245,0.4)', fontSize: '0.84rem' }}>Nessun ordine trovato.</div>
+                  ) : orders.map(order => (
                     <OrderCard key={order.id} order={order} />
                   ))}
                 </motion.div>

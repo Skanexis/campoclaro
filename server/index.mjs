@@ -304,12 +304,13 @@ function readCustomerSession(req) {
   return JSON.parse(Buffer.from(body, 'base64url').toString('utf8'))
 }
 
-function verifyTelegramAuth(authData) {
+function verifyTelegramAuth(authData = {}) {
   if (!process.env.TELEGRAM_BOT_TOKEN) {
     throw new Error('TELEGRAM_BOT_TOKEN is not configured')
   }
 
   const { hash, ...data } = authData
+  if (!hash || !data.id || !data.auth_date) return false
   const checkString = Object.keys(data)
     .sort()
     .map(key => `${key}=${data[key]}`)
@@ -317,9 +318,9 @@ function verifyTelegramAuth(authData) {
   const secretKey = crypto.createHash('sha256').update(process.env.TELEGRAM_BOT_TOKEN).digest()
   const expected = crypto.createHmac('sha256', secretKey).update(checkString).digest('hex')
 
-  if (expected !== hash) return false
+  if (hash.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expected))) return false
   const authAge = Math.floor(Date.now() / 1000) - Number(data.auth_date || 0)
-  return authAge < 86400
+  return authAge >= 0 && authAge < 86400
 }
 
 function requireAdmin(req, res, next) {
@@ -786,13 +787,14 @@ app.post('/api/orders/:id/crypto-paid', async (req, res) => {
 app.post('/api/auth/telegram', (req, res) => {
   try {
     if (!verifyTelegramAuth(req.body)) return res.status(401).json({ error: 'Invalid Telegram signature' })
+    if (!adminIds.has(String(req.body.id))) return res.status(403).json({ error: 'Telegram account is not an admin' })
     const user = {
       id: String(req.body.id),
       firstName: req.body.first_name || '',
       lastName: req.body.last_name || '',
       username: req.body.username || '',
       photoUrl: req.body.photo_url || '',
-      role: adminIds.size === 0 || adminIds.has(String(req.body.id)) ? 'admin' : 'user',
+      role: 'admin',
     }
     res.cookie('cc_session', signSession(user), { httpOnly: true, sameSite: 'lax', maxAge: 7 * 86400 * 1000 })
     res.json({ user })
@@ -825,6 +827,13 @@ app.post('/api/customer/telegram', (req, res) => {
 
 app.get('/api/customer/me', (req, res) => {
   res.json({ user: readCustomerSession(req) })
+})
+
+app.get('/api/customer/orders', async (req, res) => {
+  const customer = readCustomerSession(req)
+  if (!customer?.id) return res.status(401).json({ error: 'Accesso Telegram richiesto' })
+  const orders = await readJson(ordersFile, [])
+  res.json(orders.filter(order => String(order.customer?.id || '') === String(customer.id)))
 })
 
 app.get('/api/customer/newsletter', async (req, res) => {

@@ -9,8 +9,8 @@ export function MobileNav() {
 
   const links = [
     { to: '/', icon: <Home size={20} />, label: 'Home' },
-    { to: '/catalogo', icon: <Grid3X3 size={20} />, label: 'Catalogo' },
-    { to: '/contatti', icon: <MessageCircle size={20} />, label: 'Contatti' },
+    { to: '/catalogo', icon: <Grid3X3 size={20} />, label: 'Shop' },
+    { to: '/contatti', icon: <MessageCircle size={20} />, label: 'Chat' },
     { to: '/profilo', icon: <User size={20} />, label: 'Profilo' },
   ]
 
@@ -55,7 +55,7 @@ export function MobileNav() {
                 {link.icon}
               </motion.div>
             ) : link.icon}
-            <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.58rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
               {link.label}
             </span>
           </Link>
@@ -105,31 +105,34 @@ export function MobileNav() {
               {count}
             </motion.span>
           )}
-          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            Carrello
+          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.58rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            Cart
           </span>
         </button>
 
-        <Link
-          to="/contatti"
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 4,
-            padding: '10px 0',
-            textDecoration: 'none',
-            color: isActive('/contatti') ? '#D6B25E' : 'rgba(245,245,245,0.35)',
-            transition: 'color 0.2s',
-          }}
-        >
-          <MessageCircle size={20} />
-          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            Contatti
-          </span>
-        </Link>
+        {links.slice(2).map(link => (
+          <Link
+            key={link.to}
+            to={link.to}
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+              padding: '10px 0',
+              textDecoration: 'none',
+              color: isActive(link.to) ? '#D6B25E' : 'rgba(245,245,245,0.35)',
+              transition: 'color 0.2s',
+            }}
+          >
+            {link.icon}
+            <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.58rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+              {link.label}
+            </span>
+          </Link>
+        ))}
       </div>
     </div>
   )
