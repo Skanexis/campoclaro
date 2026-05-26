@@ -190,6 +190,67 @@ function formatCustomer(customer = {}) {
   return [name, username, id].filter(Boolean).join(' · ') || 'Cliente Telegram non disponibile'
 }
 
+async function getCustomerSupportLink() {
+  const content = normalizeSiteContent(await readJson(siteContentFile, defaultSiteContent))
+  const contact = content.contacts.find(item => /telegram/i.test(item.label) && item.url)
+    || content.contacts.find(item => item.url)
+  if (!contact?.url) return ''
+  const label = contact.value || contact.label || 'Contatto ufficiale'
+  return `<a href="${escapeHtml(contact.url)}">${escapeHtml(label)}</a>`
+}
+
+async function notifyCustomerOrderUpdate(order, event, { needsSupport = false } = {}) {
+  if (order.notificationsEnabled === false || !order.customer?.id) return null
+
+  const isMeetup = order.delivery === 'meetup'
+  const statusLabel = isMeetup
+    ? ({ new: 'In attesa', processing: 'Approvato', cancelled: 'Cancellato' }[order.status] || order.status)
+    : ({ new: 'Ricevuto', processing: 'In lavorazione', shipped: 'In transito', completed: 'Completato', cancelled: 'Annullato' }[order.status] || order.status)
+  const titles = {
+    created: isMeetup ? 'Richiesta Meetup ricevuta.' : 'Ordine ricevuto.',
+    new: 'Stato ordine aggiornato.',
+    payment_reported: 'Pagamento segnalato, verifica in corso.',
+    payment_confirmed: 'Pagamento confermato.',
+    processing: isMeetup ? 'Meetup approvato.' : 'Ordine in lavorazione.',
+    shipped: 'Spedizione aggiornata.',
+    completed: 'Ordine completato.',
+    cancelled: isMeetup ? 'Meetup cancellato.' : 'Ordine annullato.',
+  }
+  const lines = [
+    `<b>${titles[event] || 'Aggiornamento ordine'}</b>`,
+    `<b>Ordine:</b> ${escapeHtml(order.id)}`,
+    `<b>Stato:</b> ${escapeHtml(statusLabel)}`,
+  ]
+
+  if (event === 'payment_confirmed') {
+    lines.push(`<b>Pagamento:</b> ${order.payment === 'crypto'
+      ? `${escapeHtml(order.cryptoCurrency)} ${escapeHtml(order.cryptoPaidAmount || '')}`.trim()
+      : 'CCPP confermato'}`)
+    if (order.cryptoTxHash) lines.push(`TX: <code>${escapeHtml(order.cryptoTxHash)}</code>`)
+  }
+
+  if (event === 'payment_reported' && order.paymentProof) {
+    lines.push(`TX segnalata: <code>${escapeHtml(order.paymentProof)}</code>`)
+  }
+
+  if (order.trackingNumber && ['shipped', 'completed'].includes(event)) {
+    lines.push(
+      `<b>Corriere:</b> ${escapeHtml(order.trackingProvider || order.courier || 'Corriere')}`,
+      `Tracking: <code>${escapeHtml(order.trackingNumber)}</code>`,
+      order.trackingUrl ? `<a href="${escapeHtml(order.trackingUrl)}">Apri tracking ufficiale</a>` : '',
+    )
+  }
+
+  if (event === 'cancelled' || needsSupport) {
+    const supportLink = await getCustomerSupportLink()
+    if (supportLink) {
+      lines.push('', event === 'cancelled' ? 'Per dettagli contatta subito lo staff:' : 'Se hai bisogno di assistenza contatta lo staff:', supportLink)
+    }
+  }
+
+  return sendTelegramMessage(order.customer.id, lines.filter(Boolean).join('\n'))
+}
+
 function normalizeSubscriber(user, enabled) {
   return {
     id: String(user.id),
@@ -213,13 +274,18 @@ async function notifyAdmins(order, reason = 'Nuovo ordine') {
   if (!adminIds.size) return
 
   const isMeetup = order.delivery === 'meetup'
+  const paymentLabel = order.payment === 'crypto'
+    ? `${escapeHtml(order.cryptoCurrency)} ${escapeHtml(order.cryptoNetwork)} · ${escapeHtml(order.paymentStatus)}`
+    : order.payment === 'ccpp'
+      ? `CCPP · ${escapeHtml(order.paymentStatus)}`
+      : 'Meetup / da concordare'
   const lines = [
     `<b>${escapeHtml(reason)}</b>`,
     `<b>Ordine:</b> ${escapeHtml(order.id)}`,
     `<b>Cliente:</b> ${escapeHtml(formatCustomer(order.customer))}`,
     `<b>Consegna:</b> ${isMeetup ? 'Meetup Barcellona' : 'Spedizione'}`,
     order.courier ? `<b>Corriere scelto:</b> ${escapeHtml(order.courier)}` : '',
-    `<b>Pagamento:</b> ${order.payment === 'crypto' ? `${escapeHtml(order.cryptoCurrency)} ${escapeHtml(order.cryptoNetwork)} · ${escapeHtml(order.paymentStatus)}` : 'Meetup / da concordare'}`,
+    `<b>Pagamento:</b> ${paymentLabel}`,
     `<b>Totale:</b> €${order.total}`,
     '',
     '<b>Prodotti</b>',
@@ -605,13 +671,7 @@ async function confirmCryptoPayment(order, payment) {
   order.cryptoTxHash = payment.txHash || ''
   order.updatedAt = order.cryptoPaidAt
 
-  if (order.notificationsEnabled !== false && order.customer?.id) {
-    await sendTelegramMessage(order.customer.id, [
-      `<b>Pagamento confermato per ordine ${escapeHtml(order.id)}.</b>`,
-      `${escapeHtml(order.cryptoCurrency)}: ${escapeHtml(order.cryptoPaidAmount)}`,
-      order.cryptoTxHash ? `TX: <code>${escapeHtml(order.cryptoTxHash)}</code>` : '',
-    ].filter(Boolean).join('\n'))
-  }
+  await notifyCustomerOrderUpdate(order, 'payment_confirmed')
 
   for (const adminId of adminIds) {
     await sendTelegramMessage(adminId, [
@@ -673,14 +733,7 @@ async function autoCompleteDeliveredOrders() {
     order.updatedAt = order.deliveredAt
     changed = true
 
-    if (order.notificationsEnabled !== false && order.customer?.id) {
-      await sendTelegramMessage(order.customer.id, [
-        `<b>Ordine ${escapeHtml(order.id)} completato.</b>`,
-        `Tracking: <code>${escapeHtml(order.trackingNumber)}</code>`,
-        order.trackingProvider ? `Corriere: ${escapeHtml(order.trackingProvider)}` : '',
-        'Se qualcosa non è arrivato, contattaci subito su Telegram.',
-      ].filter(Boolean).join('\n'))
-    }
+    await notifyCustomerOrderUpdate(order, 'completed', { needsSupport: true })
   }
 
   if (changed) await writeJson(ordersFile, orders)
@@ -695,8 +748,9 @@ async function applyAdminOrderAction(orderId, action) {
   if (action === 'paid') {
     order.paymentStatus = 'paid_confirmed'
     if (order.status === 'new') order.status = 'processing'
-  } else if (['processing', 'completed', 'cancelled'].includes(action)) {
+  } else if (['new', 'processing', 'shipped', 'completed', 'cancelled'].includes(action)) {
     order.status = action
+    if (action === 'shipped' && !order.shippedAt) order.shippedAt = new Date().toISOString()
     if (action === 'completed' && !order.deliveredAt) order.deliveredAt = new Date().toISOString()
   } else {
     return null
@@ -705,19 +759,7 @@ async function applyAdminOrderAction(orderId, action) {
   order.updatedAt = new Date().toISOString()
   await writeJson(ordersFile, orders)
 
-  if (order.notificationsEnabled !== false && order.customer?.id) {
-    const messages = {
-      paid: `Pagamento confermato per ordine <b>${escapeHtml(order.id)}</b>.`,
-      processing: order.delivery === 'meetup'
-        ? `Meetup <b>${escapeHtml(order.id)}</b> approvato.`
-        : `Ordine <b>${escapeHtml(order.id)}</b> in lavorazione.`,
-      completed: `Ordine <b>${escapeHtml(order.id)}</b> completato.`,
-      cancelled: order.delivery === 'meetup'
-        ? `Meetup <b>${escapeHtml(order.id)}</b> cancellato. Contattaci su Telegram per dettagli.`
-        : `Ordine <b>${escapeHtml(order.id)}</b> annullato. Contattaci su Telegram per dettagli.`,
-    }
-    await sendTelegramMessage(order.customer.id, messages[action] || `Aggiornamento ordine <b>${escapeHtml(order.id)}</b>.`)
-  }
+  await notifyCustomerOrderUpdate(order, action === 'paid' ? 'payment_confirmed' : action, { needsSupport: action === 'completed' })
 
   return order
 }
@@ -806,7 +848,12 @@ app.post('/api/orders', async (req, res) => {
   const orders = await readJson(ordersFile, [])
   orders.unshift(order)
   await writeJson(ordersFile, orders)
-  if (delivery === 'meetup') await notifyAdmins(order, 'Nuova richiesta Meetup')
+  await notifyCustomerOrderUpdate(order, 'created')
+  if (delivery === 'meetup') {
+    await notifyAdmins(order, 'Nuova richiesta Meetup')
+  } else if (payment === 'ccpp') {
+    await notifyAdmins(order, 'Nuovo ordine CCPP')
+  }
   res.status(201).json(order)
 })
 
@@ -839,6 +886,7 @@ app.post('/api/orders/:id/crypto-paid', async (req, res) => {
   order.paymentProof = String(req.body.txHash || '').trim()
   order.updatedAt = new Date().toISOString()
   await writeJson(ordersFile, orders)
+  await notifyCustomerOrderUpdate(order, 'payment_reported')
   await notifyAdmins(order, 'Pagamento crypto segnalato')
   res.json(order)
 })
@@ -992,6 +1040,11 @@ app.patch('/api/admin/orders/:id', requireAdmin, async (req, res) => {
   const orders = await readJson(ordersFile, [])
   const order = orders.find(item => item.id === req.params.id)
   if (!order) return res.status(404).json({ error: 'Order not found' })
+  const previousTracking = {
+    number: order.trackingNumber || '',
+    provider: order.trackingProvider || '',
+    url: order.trackingUrl || '',
+  }
 
   if (order.delivery === 'meetup' && (req.body.trackingNumber !== undefined || req.body.trackingProvider !== undefined)) {
     return res.status(400).json({ error: 'Tracking is not available for meetup orders' })
@@ -1003,7 +1056,7 @@ app.patch('/api/admin/orders/:id', requireAdmin, async (req, res) => {
       : ['new', 'processing', 'shipped', 'completed', 'cancelled']
     if (!allowedStatuses.includes(nextStatus)) return res.status(400).json({ error: 'Invalid status for delivery method' })
     const updated = await applyAdminOrderAction(req.params.id, nextStatus)
-    if (updated && ['processing', 'completed', 'cancelled'].includes(String(req.body.status))) return res.json(updated)
+    if (updated && ['new', 'processing', 'shipped', 'completed', 'cancelled'].includes(String(req.body.status))) return res.json(updated)
     order.status = nextStatus
   }
   if (req.body.trackingNumber !== undefined) {
@@ -1011,7 +1064,7 @@ app.patch('/api/admin/orders/:id', requireAdmin, async (req, res) => {
     order.trackingNumber = tracking.trackingNumber
     order.trackingProvider = tracking.provider
     order.trackingUrl = tracking.url
-    if (order.trackingNumber && order.status === 'new') order.status = 'shipped'
+    if (order.trackingNumber && !['completed', 'cancelled'].includes(order.status)) order.status = 'shipped'
     if (order.trackingNumber && order.status === 'shipped' && !order.shippedAt) order.shippedAt = new Date().toISOString()
   } else if (req.body.trackingProvider !== undefined && order.trackingNumber) {
     const info = trackingInfo(order.trackingNumber, String(req.body.trackingProvider || 'Auto Free').trim() || 'Auto Free')
@@ -1021,6 +1074,12 @@ app.patch('/api/admin/orders/:id', requireAdmin, async (req, res) => {
 
   order.updatedAt = new Date().toISOString()
   await writeJson(ordersFile, orders)
+  const trackingChanged = previousTracking.number !== (order.trackingNumber || '')
+    || previousTracking.provider !== (order.trackingProvider || '')
+    || previousTracking.url !== (order.trackingUrl || '')
+  if (trackingChanged && order.trackingNumber) {
+    await notifyCustomerOrderUpdate(order, 'shipped')
+  }
   res.json(order)
 })
 
@@ -1109,14 +1168,7 @@ app.post('/api/telegram/webhook', async (req, res) => {
     order.trackingUrl ? `<a href="${escapeHtml(order.trackingUrl)}">Apri tracking ufficiale</a>` : '',
   ].filter(Boolean).join('\n'))
 
-  if (order.notificationsEnabled !== false && order.customer?.id) {
-    await sendTelegramMessage(order.customer.id, [
-      `<b>Il tuo ordine ${escapeHtml(order.id)} è in transito.</b>`,
-      `<b>Corriere:</b> ${escapeHtml(order.trackingProvider)}`,
-      `Tracking: <code>${escapeHtml(order.trackingNumber)}</code>`,
-      order.trackingUrl ? `<a href="${escapeHtml(order.trackingUrl)}">Apri tracking ufficiale</a>` : '',
-    ].filter(Boolean).join('\n'))
-  }
+  await notifyCustomerOrderUpdate(order, 'shipped')
 
   res.json({ ok: true })
 })

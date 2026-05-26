@@ -917,20 +917,62 @@ export function AdminPage() {
 
       <style>{`
         .admin-order-label {
-          margin-bottom: 8px;
+          margin-bottom: 5px;
           font-family: 'Inter', sans-serif;
-          font-size: 0.62rem;
+          font-size: 0.58rem;
           letter-spacing: 0.14em;
           text-transform: uppercase;
           color: rgba(245,245,245,0.34);
         }
         .admin-order-muted {
-          margin-top: 4px;
+          margin-top: 3px;
           font-family: 'Inter', sans-serif;
-          font-size: 0.74rem;
-          line-height: 1.45;
+          font-size: 0.7rem;
+          line-height: 1.35;
           color: rgba(245,245,245,0.43);
           overflow-wrap: anywhere;
+        }
+        .admin-orders-grid {
+          gap: 8px !important;
+          padding: 10px !important;
+        }
+        .admin-order-card {
+          padding: 11px !important;
+        }
+        .admin-order-card-header {
+          gap: 10px !important;
+          margin-bottom: 9px !important;
+        }
+        .admin-order-tags {
+          gap: 5px !important;
+          margin-bottom: 9px !important;
+        }
+        .admin-order-tags span {
+          padding: 3px 7px !important;
+          font-size: 0.64rem !important;
+        }
+        .admin-order-sections {
+          gap: 7px !important;
+          margin-bottom: 8px !important;
+        }
+        .admin-order-info-card {
+          padding: 8px 9px !important;
+        }
+        .admin-order-item {
+          margin-bottom: 4px !important;
+        }
+        .admin-order-crypto,
+        .admin-tracking-panel {
+          margin-bottom: 8px !important;
+          padding: 8px !important;
+        }
+        .admin-order-footer {
+          gap: 6px !important;
+        }
+        .admin-order-footer button:not([title]),
+        .admin-order-footer select {
+          padding-top: 7px !important;
+          padding-bottom: 7px !important;
         }
         @media (max-width: 1080px) {
           .admin-order-sections {
@@ -1000,38 +1042,38 @@ export function AdminPage() {
             padding: 12px !important;
           }
           .admin-orders-grid {
-            padding: 8px !important;
-            gap: 8px !important;
+            padding: 6px !important;
+            gap: 6px !important;
           }
           .admin-order-card {
-            padding: 12px !important;
+            padding: 9px !important;
             overflow-wrap: anywhere;
           }
           .admin-order-card-header {
-            gap: 8px !important;
-            margin-bottom: 12px !important;
+            gap: 6px !important;
+            margin-bottom: 7px !important;
           }
           .admin-order-total > div:last-child {
             font-size: 1.1rem !important;
           }
           .admin-order-tags {
-            margin-bottom: 10px !important;
+            margin-bottom: 7px !important;
           }
           .admin-order-sections {
             grid-template-columns: 1fr !important;
-            gap: 8px !important;
+            gap: 6px !important;
           }
           .admin-order-sections > section:last-child {
             grid-column: auto;
           }
           .admin-order-info-card {
-            padding: 10px !important;
+            padding: 8px !important;
           }
           .admin-order-item {
             align-items: flex-start;
           }
           .admin-tracking-panel {
-            padding: 10px !important;
+            padding: 8px !important;
           }
           .admin-order-filters {
             top: 72px !important;
