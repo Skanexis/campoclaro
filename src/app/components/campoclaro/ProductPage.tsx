@@ -61,7 +61,7 @@ export function ProductPage() {
   const relatedProducts = products.filter(p => p.id !== product.id).slice(0, 3)
 
   return (
-    <div style={{ minHeight: '100vh', paddingTop: 72 }}>
+    <div className="cc-product-page" style={{ minHeight: '100vh', paddingTop: 72 }}>
       {/* Back */}
       <div className="product-back" style={{ maxWidth: 1280, margin: '0 auto', padding: '16px 24px 0' }}>
         <motion.button
@@ -550,6 +550,10 @@ export function ProductPage() {
 
       <style>{`
         @media (max-width: 768px) {
+          .cc-product-page {
+            max-width: 100%;
+            overflow-x: hidden;
+          }
           .product-grid {
             grid-template-columns: 1fr !important;
             gap: 16px !important;
@@ -597,6 +601,16 @@ export function ProductPage() {
           .related-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
             gap: 10px !important;
+          }
+        }
+        @media (max-width: 420px) {
+          .cc-product-page {
+            padding-top: 64px !important;
+          }
+        }
+        @media (max-width: 350px) {
+          .related-grid {
+            grid-template-columns: 1fr !important;
           }
         }
       `}</style>

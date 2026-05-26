@@ -335,9 +335,9 @@ export function CatalogPage() {
     })
 
   return (
-    <div style={{ minHeight: '100vh', paddingTop: 72 }}>
+    <div className="cc-catalog-page" style={{ minHeight: '100vh', paddingTop: 72 }}>
       {/* Header */}
-      <div style={{
+      <div className="catalog-header" style={{
         padding: '36px 24px 26px',
         borderBottom: '1px solid rgba(255,255,255,0.04)',
         background: 'linear-gradient(180deg, rgba(26,16,40,0.12), transparent)',
@@ -374,7 +374,7 @@ export function CatalogPage() {
       </div>
 
       {/* Filters */}
-      <div style={{
+      <div className="catalog-toolbar" style={{
         padding: '14px 24px',
         borderBottom: '1px solid rgba(255,255,255,0.04)',
         position: 'sticky',
@@ -384,9 +384,9 @@ export function CatalogPage() {
         WebkitBackdropFilter: 'blur(20px)',
         zIndex: 50,
       }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div className="catalog-toolbar-inner" style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           {/* Category Pills */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="catalog-filter-pills" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {categories.map(cat => (
               <motion.button
                 key={cat}
@@ -429,8 +429,8 @@ export function CatalogPage() {
           </div>
 
           {/* Sort */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 34, padding: '0 11px', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, background: 'rgba(255,255,255,0.025)' }}>
+          <div className="catalog-controls" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <div className="catalog-search" style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 34, padding: '0 11px', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, background: 'rgba(255,255,255,0.025)' }}>
               <Search size={13} color="rgba(245,245,245,0.32)" />
               <input
                 value={query}
@@ -472,7 +472,7 @@ export function CatalogPage() {
       </div>
 
       {/* Products Grid */}
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '48px 24px 100px' }}>
+      <div className="catalog-content" style={{ maxWidth: 1280, margin: '0 auto', padding: '48px 24px 100px' }}>
         <motion.div
           className="catalog-grid"
           layout
@@ -507,6 +507,38 @@ export function CatalogPage() {
 
       <style>{`
         @media (max-width: 700px) {
+          .cc-catalog-page {
+            padding-top: 64px !important;
+          }
+          .catalog-header {
+            padding: 24px 12px 20px !important;
+          }
+          .catalog-toolbar {
+            top: 64px !important;
+            padding: 10px 12px !important;
+          }
+          .catalog-toolbar-inner,
+          .catalog-controls {
+            align-items: stretch !important;
+            width: 100%;
+          }
+          .catalog-filter-pills {
+            width: 100%;
+          }
+          .catalog-controls {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) auto auto;
+          }
+          .catalog-search {
+            min-width: 0;
+          }
+          .catalog-search input {
+            width: 100% !important;
+            min-width: 0;
+          }
+          .catalog-content {
+            padding: 20px 12px calc(86px + env(safe-area-inset-bottom, 0px)) !important;
+          }
           .catalog-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
             gap: 10px !important;
@@ -540,6 +572,11 @@ export function CatalogPage() {
         @media (max-width: 420px) {
           .catalog-grid {
             gap: 8px !important;
+          }
+        }
+        @media (max-width: 350px) {
+          .catalog-grid {
+            grid-template-columns: 1fr !important;
           }
         }
       `}</style>

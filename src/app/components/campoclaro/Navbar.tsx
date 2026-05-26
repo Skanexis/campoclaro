@@ -54,7 +54,7 @@ export function Navbar() {
           transition: 'background 0.4s ease, border 0.4s ease, backdrop-filter 0.4s ease',
         }}
       >
-        <div style={{
+        <div className="cc-navbar-inner" style={{
           maxWidth: 1280,
           margin: '0 auto',
           padding: '0 24px',
@@ -64,8 +64,9 @@ export function Navbar() {
           justifyContent: 'space-between',
         }}>
           {/* Logo */}
-          <Link to="/" style={{ textDecoration: 'none' }}>
+          <Link className="cc-navbar-logo" to="/" style={{ textDecoration: 'none', minWidth: 0 }}>
             <motion.div
+              className="cc-navbar-wordmark"
               whileHover={{ scale: 1.02 }}
               style={{
                 fontFamily: "'Satoshi', sans-serif",
@@ -128,7 +129,7 @@ export function Navbar() {
           </div>
 
           {/* Actions */}
-          <div style={{ display: 'flex', gap: 'clamp(12px, 3vw, 20px)', alignItems: 'center' }}>
+          <div className="cc-navbar-actions" style={{ display: 'flex', gap: 'clamp(12px, 3vw, 20px)', alignItems: 'center' }}>
             <Link to="/profilo" style={{
               width: 34,
               height: 34,
@@ -231,6 +232,7 @@ export function Navbar() {
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
+            className="cc-mobile-menu"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -274,6 +276,24 @@ export function Navbar() {
         @keyframes shimmerGold {
           0% { background-position: 0% center; }
           100% { background-position: 200% center; }
+        }
+        @media (max-width: 420px) {
+          .cc-navbar-inner {
+            height: 64px !important;
+            padding: 0 12px !important;
+          }
+          .cc-navbar-wordmark {
+            font-size: 0.92rem !important;
+            letter-spacing: 0.15em !important;
+          }
+          .cc-navbar-actions {
+            gap: 12px !important;
+          }
+          .cc-mobile-menu {
+            top: 64px !important;
+            padding: 20px 14px !important;
+            gap: 18px !important;
+          }
         }
       `}</style>
     </>

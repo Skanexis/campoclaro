@@ -18,7 +18,7 @@ export function MobileNav() {
 
   return (
     <div
-      className="flex md:hidden"
+      className="cc-mobile-nav flex md:hidden"
       style={{
         position: 'fixed',
         bottom: 0,
@@ -32,7 +32,7 @@ export function MobileNav() {
         paddingBottom: 'env(safe-area-inset-bottom, 0)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'stretch', width: '100%' }}>
+      <div className="cc-mobile-nav-row" style={{ display: 'flex', alignItems: 'stretch', width: '100%', minWidth: 0 }}>
         {links.slice(0, 2).map(link => (
           <Link
             key={link.to}
@@ -134,6 +134,18 @@ export function MobileNav() {
           </Link>
         ))}
       </div>
+      <style>{`
+        .cc-mobile-nav-row > a,
+        .cc-mobile-nav-row > button {
+          min-width: 0;
+        }
+        @media (max-width: 340px) {
+          .cc-mobile-nav-row span {
+            font-size: 0.52rem !important;
+            letter-spacing: 0.02em !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }

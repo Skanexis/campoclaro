@@ -359,6 +359,7 @@ export function CartDrawer() {
 
           {/* Drawer */}
           <motion.div
+            className="cc-cart-drawer"
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
@@ -378,7 +379,7 @@ export function CartDrawer() {
             }}
           >
             {/* Header */}
-            <div style={{
+            <div className="cc-cart-header" style={{
               padding: '20px 24px',
               borderBottom: '1px solid rgba(255,255,255,0.05)',
               display: 'flex',
@@ -419,7 +420,7 @@ export function CartDrawer() {
 
             {/* Step indicator */}
             {step !== 'success' && (
-              <div style={{ padding: '12px 24px', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', gap: 4, flexShrink: 0 }}>
+              <div className="cc-cart-steps" style={{ padding: '12px 24px', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', gap: 4, flexShrink: 0 }}>
                 {(['cart', 'payment', 'confirm'] as Step[]).map((s, i) => (
                   <div
                     key={s}
@@ -459,6 +460,7 @@ export function CartDrawer() {
                         <div style={{ marginBottom: 28 }}>
                           {items.map(item => (
                             <motion.div
+                              className="cc-cart-item"
                               key={itemKey(item)}
                               layout
                               initial={{ opacity: 0, y: 10 }}
@@ -498,7 +500,7 @@ export function CartDrawer() {
                                   </div>
                                 )}
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div className="cc-cart-item-controls" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                 <motion.button whileTap={{ scale: 0.85 }} onClick={() => updateQuantity(item.id, item.weight, -1, item.strain)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4, cursor: 'pointer', color: 'rgba(245,245,245,0.5)', width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                   <Minus size={11} />
                                 </motion.button>
@@ -521,7 +523,7 @@ export function CartDrawer() {
                           <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 12 }}>
                             Modalità di consegna
                           </div>
-                          <div style={{ display: 'flex', gap: 10 }}>
+                          <div className="cc-cart-delivery" style={{ display: 'flex', gap: 10 }}>
                             <DeliveryCard method="ship" selected={delivery === 'ship'} onSelect={() => setDelivery('ship')} />
                             <DeliveryCard method="meetup" selected={delivery === 'meetup'} onSelect={() => setDelivery('meetup')} />
                           </div>
@@ -622,7 +624,7 @@ export function CartDrawer() {
                               style={{ overflow: 'hidden', marginBottom: 8 }}
                             >
                               <FloatingInput label="Via e numero civico" value={address.via} onChange={v => setAddress(a => ({ ...a, via: v }))} />
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                              <div className="cc-cart-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                                 <FloatingInput label="Città" value={address.city} onChange={v => setAddress(a => ({ ...a, city: v }))} />
                                 <FloatingInput label="CAP" value={address.cap} onChange={v => setAddress(a => ({ ...a, cap: v }))} />
                               </div>
@@ -653,7 +655,7 @@ export function CartDrawer() {
                             <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 12 }}>
                               Corriere
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+                            <div className="cc-cart-couriers" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
                               {COURIERS.map(option => {
                                 const selected = courier === option.id
                                 return (
@@ -714,7 +716,7 @@ export function CartDrawer() {
                         <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 10 }}>
                           Valuta crypto
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+                        <div className="cc-cart-crypto-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
                           {(Object.keys(CRYPTO_WALLETS) as CryptoCurrency[]).map(currency => {
                             const selected = cryptoCurrency === currency
                             const wallet = CRYPTO_WALLETS[currency]
@@ -938,6 +940,7 @@ export function CartDrawer() {
                           ...(lastOrder?.cryptoPaymentUri ? [{ label: 'Payment URI', value: lastOrder.cryptoPaymentUri, onClick: copyCryptoUri }] : []),
                         ].map(item => (
                           <button
+                            className="cc-cart-payment-copy"
                             key={item.label}
                             type="button"
                             onClick={item.onClick}
@@ -1026,7 +1029,7 @@ export function CartDrawer() {
 
             {/* Footer */}
             {items.length > 0 && step !== 'success' && (
-              <div style={{
+              <div className="cc-cart-footer" style={{
                 padding: '20px 24px',
                 borderTop: '1px solid rgba(255,255,255,0.05)',
                 flexShrink: 0,

@@ -13,8 +13,8 @@ export function ContactPage() {
   const content = useSiteContent()
 
   return (
-    <div style={{ minHeight: '100vh', paddingTop: 72 }}>
-      <section style={{
+    <div className="cc-contact-page" style={{ minHeight: '100vh', paddingTop: 72 }}>
+      <section className="contact-hero" style={{
         padding: '72px 24px 40px',
         background: 'linear-gradient(180deg, rgba(214,178,94,0.08), transparent)',
         borderBottom: '1px solid rgba(255,255,255,0.04)',
@@ -54,9 +54,9 @@ export function ContactPage() {
         </div>
       </section>
 
-      <section style={{ padding: '48px 24px 110px' }}>
+      <section className="contact-content" style={{ padding: '48px 24px 110px' }}>
         <div style={{ maxWidth: 1080, margin: '0 auto' }}>
-          <div style={{
+          <div className="contact-security" style={{
             display: 'flex',
             alignItems: 'center',
             gap: 10,
@@ -73,7 +73,7 @@ export function ContactPage() {
             </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+          <div className="contact-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
             {content.contacts.map((contact, i) => (
               <motion.a
                 className="cc-interactive-card cc-animated-surface"
@@ -115,6 +115,31 @@ export function ContactPage() {
           </div>
         </div>
       </section>
+      <style>{`
+        @media (max-width: 700px) {
+          .cc-contact-page {
+            padding-top: 64px !important;
+          }
+          .contact-hero {
+            padding: 42px 12px 26px !important;
+          }
+          .contact-content {
+            padding: 26px 12px calc(90px + env(safe-area-inset-bottom, 0px)) !important;
+          }
+          .contact-security {
+            align-items: flex-start !important;
+            padding: 12px !important;
+          }
+          .contact-grid {
+            grid-template-columns: 1fr !important;
+            gap: 10px !important;
+          }
+          .contact-grid a {
+            min-height: 108px !important;
+            padding: 14px !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }

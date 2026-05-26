@@ -476,105 +476,121 @@ export function AdminPage() {
             </div>
             {filteredOrders.length === 0 ? (
               <div className="admin-empty-state" style={{ padding: 32, color: 'rgba(245,245,245,0.38)', fontFamily: "'Inter', sans-serif" }}>Nessun ordine.</div>
-            ) : filteredOrders.map(order => (
-              <div key={order.id} className="admin-list-row" style={{ padding: '13px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 1.1fr auto', gap: 14, alignItems: 'start' }} className="admin-row">
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 5 }}>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", color: '#D6B25E' }}>{order.id}</span>
-                      <StatusBadge status={order.status} meetup={order.delivery === 'meetup'} />
-                    </div>
-                    <div style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.35)', fontSize: '0.76rem' }}>
-                      {new Date(order.createdAt).toLocaleString('it-IT')} · {order.delivery} · {order.payment} · notifiche {order.notificationsEnabled === false ? 'off' : 'on'}
-                    </div>
-                    {order.courier && (
-                      <div style={{ marginTop: 6, fontFamily: "'Inter', sans-serif", color: '#D6B25E', fontSize: '0.76rem' }}>
-                        Corriere scelto: {order.courier}
-                      </div>
-                    )}
-                    {order.payment === 'crypto' && order.cryptoWallet && (
-                      <div style={{ marginTop: 7, fontFamily: "'JetBrains Mono', monospace", color: 'rgba(245,245,245,0.46)', fontSize: '0.72rem', wordBreak: 'break-all' }}>
-                        {order.cryptoCurrency} {order.cryptoNetwork} · {order.paymentStatus || 'awaiting_crypto'} · {order.cryptoWallet}
-                      </div>
-                    )}
-                    <div style={{ marginTop: 10 }}>
-                      {order.items.map(item => (
-                        <div key={`${item.id}-${item.weight}-${item.strain || 'default'}`} style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.62)', fontSize: '0.84rem', marginBottom: 4 }}>
-                          {item.name} {item.weight}{item.strain ? ` · ${item.strain}` : ''} x{item.quantity}
+            ) : (
+              <div className="admin-orders-grid" style={{ display: 'grid', gap: 12, padding: 14 }}>
+                {filteredOrders.map(order => {
+                  const isMeetup = order.delivery === 'meetup'
+                  const customerName = [order.customer?.firstName, order.customer?.lastName].filter(Boolean).join(' ') || 'Cliente'
+                  const paymentLabel = order.payment === 'crypto' ? 'Crypto' : order.payment === 'ccpp' ? 'CCPP' : isMeetup ? 'Da concordare' : order.payment
+                  return (
+                    <article key={order.id} className="admin-order-card" style={{ ...panel, padding: 16 }}>
+                      <header className="admin-order-card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 14 }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 7 }}>
+                            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.86rem', fontWeight: 700, color: '#D6B25E' }}>{order.id}</span>
+                            <StatusBadge status={order.status} meetup={isMeetup} />
+                          </div>
+                          <div style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.38)', fontSize: '0.74rem' }}>
+                            {new Date(order.createdAt).toLocaleString('it-IT')}
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.42)', fontSize: '0.8rem', lineHeight: 1.6 }}>
-                    {order.address?.via || order.address?.city ? `${order.address.via || ''}, ${order.address.city || ''} ${order.address.cap || ''}` : 'Ritiro / dettagli privati'}
-                    {order.address?.notes && <div>{order.address.notes}</div>}
-                    {Number(order.fees || 0) > 0 && <div>Supplemento CCPP: €{order.fees}</div>}
-                    {order.delivery !== 'meetup' && <div className="admin-tracking-controls" style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <input
-                        value={trackingDrafts[order.id] || ''}
-                        onChange={e => setTrackingDrafts(prev => ({ ...prev, [order.id]: e.target.value }))}
-                        placeholder="Tracking number"
-                        style={{
-                          minWidth: 180,
-                          flex: 1,
-                          background: 'rgba(255,255,255,0.035)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: 6,
-                          color: '#F5F5F5',
-                          fontFamily: "'Inter', sans-serif",
-                          fontSize: '0.78rem',
-                          outline: 'none',
-                          padding: '8px 10px',
-                        }}
-                      />
-                      <button onClick={() => saveOrderTracking(order.id)} style={{ padding: '8px 10px', background: 'rgba(214,178,94,0.1)', border: '1px solid rgba(214,178,94,0.3)', borderRadius: 6, color: '#D6B25E', cursor: 'pointer', fontSize: '0.75rem' }}>
-                        Salva track
-                      </button>
-                      {['UPS', 'InPost', 'SEUR', 'GLS'].map(provider => (
-                        <button
-                          key={provider}
-                          type="button"
-                          onClick={() => saveOrderTrackingWithProvider(order.id, provider)}
-                          style={{ padding: '8px 9px', background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: 'rgba(245,245,245,0.58)', cursor: 'pointer', fontSize: '0.72rem' }}
-                        >
-                          {provider}
-                        </button>
-                      ))}
-                      {order.trackingUrl && (
-                        <a href={order.trackingUrl} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#D6B25E', textDecoration: 'none', fontSize: '0.75rem' }}>
-                          <ExternalLink size={13} /> {order.trackingProvider || 'Track'}
-                        </a>
+                        <div className="admin-order-total" style={{ textAlign: 'right' }}>
+                          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.62rem', letterSpacing: '0.13em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.34)', marginBottom: 4 }}>Totale</div>
+                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '1.35rem', fontWeight: 700, color: '#D6B25E' }}>€{order.total}</div>
+                        </div>
+                      </header>
+
+                      <div className="admin-order-tags" style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 14 }}>
+                        {[isMeetup ? 'Meetup' : 'Spedizione', paymentLabel, order.notificationsEnabled === false ? 'Notifiche off' : 'Notifiche on'].map(label => (
+                          <span key={label} style={{ padding: '5px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(245,245,245,0.54)', fontFamily: "'Inter', sans-serif", fontSize: '0.68rem' }}>
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+
+                      <div className="admin-order-sections" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.25fr', gap: 10, marginBottom: 12 }}>
+                        <section className="admin-order-info-card" style={{ padding: 12, borderRadius: 7, border: '1px solid rgba(255,255,255,0.065)', background: 'rgba(255,255,255,0.02)' }}>
+                          <div className="admin-order-label">Cliente</div>
+                          <div style={{ color: '#F5F5F5', fontFamily: "'Satoshi', sans-serif", fontWeight: 700, marginBottom: 5 }}>{customerName}</div>
+                          {order.customer?.username && <div className="admin-order-muted">@{order.customer.username}</div>}
+                          <div className="admin-order-muted">{order.customer?.id ? `Telegram ID: ${order.customer.id}` : 'ID Telegram non disponibile'}</div>
+                        </section>
+
+                        <section className="admin-order-info-card" style={{ padding: 12, borderRadius: 7, border: '1px solid rgba(255,255,255,0.065)', background: 'rgba(255,255,255,0.02)' }}>
+                          <div className="admin-order-label">Consegna</div>
+                          <div style={{ color: '#F5F5F5', fontFamily: "'Inter', sans-serif", fontSize: '0.82rem', marginBottom: 5 }}>
+                            {isMeetup ? 'Meetup Barcellona' : `${order.address?.via || '-'}, ${order.address?.city || '-'} ${order.address?.cap || ''}`}
+                          </div>
+                          {!isMeetup && order.courier && <div className="admin-order-muted">Corriere: {order.courier}</div>}
+                          {order.address?.notes && <div className="admin-order-muted">Note: {order.address.notes}</div>}
+                        </section>
+
+                        <section className="admin-order-info-card" style={{ padding: 12, borderRadius: 7, border: '1px solid rgba(255,255,255,0.065)', background: 'rgba(255,255,255,0.02)' }}>
+                          <div className="admin-order-label">Prodotti</div>
+                          {order.items.map(item => (
+                            <div key={`${item.id}-${item.weight}-${item.strain || 'default'}`} className="admin-order-item" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+                              <span style={{ color: 'rgba(245,245,245,0.68)', fontFamily: "'Inter', sans-serif", fontSize: '0.8rem' }}>
+                                {item.name} · {item.weight}{item.strain ? ` · ${item.strain}` : ''} x{item.quantity}
+                              </span>
+                              <span style={{ color: '#D6B25E', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.78rem', flexShrink: 0 }}>
+                                €{Number(item.price) * Number(item.quantity || 1)}
+                              </span>
+                            </div>
+                          ))}
+                          {Number(order.fees || 0) > 0 && <div className="admin-order-muted">Supplemento CCPP: €{order.fees}</div>}
+                        </section>
+                      </div>
+
+                      {order.payment === 'crypto' && order.cryptoWallet && (
+                        <div className="admin-order-crypto" style={{ marginBottom: 12, padding: 10, border: '1px solid rgba(214,178,94,0.12)', borderRadius: 7, background: 'rgba(214,178,94,0.035)', fontFamily: "'JetBrains Mono', monospace", color: 'rgba(245,245,245,0.55)', fontSize: '0.7rem', overflowWrap: 'anywhere' }}>
+                          {order.cryptoCurrency} {order.cryptoNetwork} · {order.paymentStatus || 'awaiting_crypto'} · {order.cryptoWallet}
+                        </div>
                       )}
-                    </div>}
-                  </div>
-                  <div className="admin-order-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    {order.delivery === 'meetup' ? (
-                      <>
-                        <button type="button" onClick={() => quickOrderStatus(order.id, 'processing')} style={{ padding: '8px 11px', borderRadius: 6, border: '1px solid rgba(76,175,125,0.28)', background: 'rgba(76,175,125,0.1)', color: '#6ECF95', cursor: 'pointer' }}>
-                          Approvato
-                        </button>
-                        <button type="button" onClick={() => quickOrderStatus(order.id, 'cancelled')} style={{ padding: '8px 11px', borderRadius: 6, border: '1px solid rgba(229,115,115,0.28)', background: 'rgba(229,115,115,0.1)', color: '#E57373', cursor: 'pointer' }}>
-                          Cancellato
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <select value={order.status} onChange={e => updateOrderStatus(order.id, e.target.value)} style={{ background: '#111', color: '#F5F5F5', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '8px 10px' }}>
-                          {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                        </select>
-                        <button type="button" title="Completato" onClick={() => quickOrderStatus(order.id, 'completed')} style={{ width: 34, height: 34, borderRadius: 6, border: '1px solid rgba(76,175,125,0.28)', background: 'rgba(76,175,125,0.1)', color: '#6ECF95', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Check size={15} />
-                        </button>
-                        <button type="button" title="Annulla" onClick={() => quickOrderStatus(order.id, 'cancelled')} style={{ width: 34, height: 34, borderRadius: 6, border: '1px solid rgba(229,115,115,0.28)', background: 'rgba(229,115,115,0.1)', color: '#E57373', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <X size={15} />
-                        </button>
-                      </>
-                    )}
-                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#D6B25E' }}>€{order.total}</div>
-                  </div>
-                </div>
+
+                      {order.delivery !== 'meetup' && (
+                        <div className="admin-tracking-panel" style={{ marginBottom: 12, padding: 12, borderRadius: 7, background: 'rgba(255,255,255,0.018)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                          <div className="admin-order-label">Tracking</div>
+                          <div className="admin-tracking-controls" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <input
+                              value={trackingDrafts[order.id] || ''}
+                              onChange={e => setTrackingDrafts(prev => ({ ...prev, [order.id]: e.target.value }))}
+                              placeholder="Tracking number"
+                              style={{ minWidth: 210, flex: 1, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: '#F5F5F5', fontFamily: "'Inter', sans-serif", fontSize: '0.78rem', outline: 'none', padding: '8px 10px' }}
+                            />
+                            <button onClick={() => saveOrderTracking(order.id)} style={{ padding: '8px 10px', background: 'rgba(214,178,94,0.1)', border: '1px solid rgba(214,178,94,0.3)', borderRadius: 6, color: '#D6B25E', cursor: 'pointer', fontSize: '0.75rem' }}>Salva</button>
+                            {['UPS', 'InPost', 'SEUR', 'GLS'].map(provider => (
+                              <button key={provider} type="button" onClick={() => saveOrderTrackingWithProvider(order.id, provider)} style={{ padding: '8px 9px', background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: 'rgba(245,245,245,0.58)', cursor: 'pointer', fontSize: '0.72rem' }}>{provider}</button>
+                            ))}
+                            {order.trackingUrl && (
+                              <a href={order.trackingUrl} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#D6B25E', textDecoration: 'none', fontSize: '0.75rem' }}>
+                                <ExternalLink size={13} /> {order.trackingProvider || 'Track'}
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <footer className="admin-order-footer" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        {isMeetup ? (
+                          <>
+                            <button type="button" onClick={() => quickOrderStatus(order.id, 'processing')} style={{ padding: '9px 13px', borderRadius: 6, border: '1px solid rgba(76,175,125,0.28)', background: 'rgba(76,175,125,0.1)', color: '#6ECF95', cursor: 'pointer' }}>Approvato</button>
+                            <button type="button" onClick={() => quickOrderStatus(order.id, 'cancelled')} style={{ padding: '9px 13px', borderRadius: 6, border: '1px solid rgba(229,115,115,0.28)', background: 'rgba(229,115,115,0.1)', color: '#E57373', cursor: 'pointer' }}>Cancellato</button>
+                          </>
+                        ) : (
+                          <>
+                            <select value={order.status} onChange={e => updateOrderStatus(order.id, e.target.value)} style={{ background: '#111', color: '#F5F5F5', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '9px 10px' }}>
+                              {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                            </select>
+                            <button type="button" title="Completato" onClick={() => quickOrderStatus(order.id, 'completed')} style={{ width: 36, height: 36, borderRadius: 6, border: '1px solid rgba(76,175,125,0.28)', background: 'rgba(76,175,125,0.1)', color: '#6ECF95', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={15} /></button>
+                            <button type="button" title="Annulla" onClick={() => quickOrderStatus(order.id, 'cancelled')} style={{ width: 36, height: 36, borderRadius: 6, border: '1px solid rgba(229,115,115,0.28)', background: 'rgba(229,115,115,0.1)', color: '#E57373', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
+                          </>
+                        )}
+                      </footer>
+                    </article>
+                  )
+                })}
               </div>
-            ))}
+            )}
           </motion.div>
         )}
 
@@ -790,7 +806,7 @@ export function AdminPage() {
                 </div>
                 <div style={{ display: 'grid', gap: 10, marginBottom: 18 }}>
                   {siteContent.productFilters.map((filter, i) => (
-                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'end' }}>
+                    <div key={i} className="admin-inline-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'end' }}>
                       <Field label={`Filtro ${i + 1}`} value={filter} onChange={v => updateFilterName(i, v)} />
                       <button
                         onClick={() => removeFilter(i)}
@@ -900,6 +916,30 @@ export function AdminPage() {
       </div>
 
       <style>{`
+        .admin-order-label {
+          margin-bottom: 8px;
+          font-family: 'Inter', sans-serif;
+          font-size: 0.62rem;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: rgba(245,245,245,0.34);
+        }
+        .admin-order-muted {
+          margin-top: 4px;
+          font-family: 'Inter', sans-serif;
+          font-size: 0.74rem;
+          line-height: 1.45;
+          color: rgba(245,245,245,0.43);
+          overflow-wrap: anywhere;
+        }
+        @media (max-width: 1080px) {
+          .admin-order-sections {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          }
+          .admin-order-sections > section:last-child {
+            grid-column: 1 / -1;
+          }
+        }
         @media (max-width: 860px) {
           .cc-admin-page {
             padding: 84px 12px calc(82px + env(safe-area-inset-bottom, 0px)) !important;
@@ -959,6 +999,40 @@ export function AdminPage() {
           .admin-list-row {
             padding: 12px !important;
           }
+          .admin-orders-grid {
+            padding: 8px !important;
+            gap: 8px !important;
+          }
+          .admin-order-card {
+            padding: 12px !important;
+            overflow-wrap: anywhere;
+          }
+          .admin-order-card-header {
+            gap: 8px !important;
+            margin-bottom: 12px !important;
+          }
+          .admin-order-total > div:last-child {
+            font-size: 1.1rem !important;
+          }
+          .admin-order-tags {
+            margin-bottom: 10px !important;
+          }
+          .admin-order-sections {
+            grid-template-columns: 1fr !important;
+            gap: 8px !important;
+          }
+          .admin-order-sections > section:last-child {
+            grid-column: auto;
+          }
+          .admin-order-info-card {
+            padding: 10px !important;
+          }
+          .admin-order-item {
+            align-items: flex-start;
+          }
+          .admin-tracking-panel {
+            padding: 10px !important;
+          }
           .admin-order-filters {
             top: 72px !important;
             gap: 6px !important;
@@ -969,13 +1043,28 @@ export function AdminPage() {
             min-width: 0 !important;
             width: 100%;
           }
-          .admin-order-actions {
-            flex-wrap: wrap;
-            gap: 8px !important;
-            justify-content: space-between;
+          .admin-order-footer {
+            justify-content: stretch !important;
+          }
+          .admin-order-footer select {
+            flex: 1;
           }
           .admin-product-list {
             max-height: 38vh;
+          }
+        }
+        @media (max-width: 420px) {
+          .admin-order-card-header {
+            flex-direction: column;
+          }
+          .admin-order-total {
+            text-align: left !important;
+          }
+          .admin-inline-row {
+            grid-template-columns: 1fr !important;
+          }
+          .admin-inline-row button {
+            width: 100%;
           }
         }
         @media (max-width: 340px) {

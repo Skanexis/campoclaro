@@ -130,6 +130,7 @@ export function HomePage() {
       >
         {/* Hero */}
         <section
+          className="home-hero"
           ref={heroRef}
           style={{
             minHeight: '100vh',
@@ -320,8 +321,8 @@ export function HomePage() {
         </section>
 
         {/* Stats Row */}
-        <motion.section {...REVEAL} style={{ padding: '60px 24px', borderTop: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-          <div style={{ maxWidth: 960, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 40 }}>
+        <motion.section className="home-stats-section" {...REVEAL} style={{ padding: '60px 24px', borderTop: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+          <div className="home-stats-grid" style={{ maxWidth: 960, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 40 }}>
             {[
               { icon: <Shield size={20} />, label: 'Qualità Garantita', value: '100%' },
               { icon: <Star size={20} />, label: 'Varietà Premium', value: '6+' },
@@ -360,7 +361,7 @@ export function HomePage() {
         </motion.section>
 
         {/* Operations Info */}
-        <section style={{ padding: '96px 24px 40px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <section className="home-info-section" style={{ padding: '96px 24px 40px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
           <div style={{ maxWidth: 1280, margin: '0 auto' }}>
             <motion.div {...REVEAL} style={{ display: 'grid', gridTemplateColumns: '0.85fr 1.15fr', gap: 40, alignItems: 'start' }} className="home-info-grid">
               <div>
@@ -467,6 +468,7 @@ export function HomePage() {
 
         {/* Manifesto */}
         <motion.section
+          className="home-manifesto"
           {...REVEAL}
           style={{
             padding: '100px 24px',
@@ -498,7 +500,7 @@ export function HomePage() {
         </motion.section>
 
         {/* Footer */}
-        <footer style={{
+        <footer className="home-footer" style={{
           padding: '40px 24px',
           borderTop: '1px solid rgba(255,255,255,0.04)',
           display: 'flex',
@@ -545,6 +547,30 @@ export function HomePage() {
           }
         }
         @media (max-width: 700px) {
+          .home-hero {
+            min-height: 100dvh !important;
+            padding: 98px 14px 78px !important;
+          }
+          .home-stats-section {
+            padding: 34px 12px !important;
+          }
+          .home-stats-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: 10px !important;
+          }
+          .home-stats-grid > div {
+            gap: 8px !important;
+          }
+          .home-stats-grid > div > div:nth-child(2) {
+            font-size: 1.3rem !important;
+          }
+          .home-stats-grid > div > div:last-child {
+            font-size: 0.6rem !important;
+            letter-spacing: 0.04em !important;
+          }
+          .home-info-section {
+            padding: 48px 12px 30px !important;
+          }
           .home-info-cards {
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
             gap: 10px !important;
@@ -586,6 +612,21 @@ export function HomePage() {
           }
           .home-product-desc {
             display: none !important;
+          }
+          .home-manifesto {
+            padding: 54px 14px !important;
+          }
+          .home-footer {
+            padding: 26px 14px calc(88px + env(safe-area-inset-bottom, 0px)) !important;
+          }
+        }
+        @media (max-width: 350px) {
+          .home-stats-grid {
+            grid-template-columns: 1fr !important;
+            gap: 24px !important;
+          }
+          .home-info-cards {
+            grid-template-columns: 1fr !important;
           }
         }
       `}</style>

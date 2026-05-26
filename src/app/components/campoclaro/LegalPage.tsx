@@ -28,8 +28,8 @@ export function LegalPage({ type }: LegalPageProps) {
   const isPrivacy = type === 'privacy'
 
   return (
-    <div style={{ minHeight: '100vh', paddingTop: 72 }}>
-      <div style={{ maxWidth: 860, margin: '0 auto', padding: '56px 24px 100px' }}>
+    <div className="cc-legal-page" style={{ minHeight: '100vh', paddingTop: 72 }}>
+      <div className="legal-content" style={{ maxWidth: 860, margin: '0 auto', padding: '56px 24px 100px' }}>
         <Link to="/profilo" style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.78rem', color: '#D6B25E', textDecoration: 'none' }}>
           Torna all'area privata
         </Link>
@@ -114,6 +114,19 @@ export function LegalPage({ type }: LegalPageProps) {
           </>
         )}
       </div>
+      <style>{`
+        .legal-content p {
+          overflow-wrap: anywhere;
+        }
+        @media (max-width: 700px) {
+          .cc-legal-page {
+            padding-top: 64px !important;
+          }
+          .legal-content {
+            padding: 30px 12px calc(92px + env(safe-area-inset-bottom, 0px)) !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }

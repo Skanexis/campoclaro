@@ -1,16 +1,24 @@
 html {
   scroll-behavior: smooth;
+  min-height: 100%;
+  background-color: #050505;
+  overscroll-behavior: none;
 }
 
 html,
 body,
 #root {
+  width: 100%;
   max-width: 100%;
+  min-height: 100%;
+  margin: 0;
   overflow-x: hidden;
+  background-color: #050505;
 }
 
 body {
-  overscroll-behavior-y: none;
+  min-height: 100dvh;
+  overscroll-behavior: none;
   background:
     radial-gradient(circle at 14% 4%, rgba(38,178,165,0.08), transparent 27rem),
     radial-gradient(circle at 82% 0%, rgba(182,64,92,0.08), transparent 25rem),
@@ -18,16 +26,105 @@ body {
     #050505;
 }
 
+#root {
+  min-height: 100dvh;
+  isolation: isolate;
+}
+
 .cc-shell {
   width: 100%;
   min-width: 0;
-  overflow-x: clip;
+  max-width: 100vw;
+  min-height: 100dvh !important;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  background-color: #050505;
+}
+
+img,
+video,
+canvas {
+  max-width: 100%;
+}
+
+.cc-mobile-nav,
+.cc-navbar-inner,
+.cc-catalog-page,
+.cc-contact-page,
+.cc-legal-page,
+.cc-product-page,
+.cc-cart-drawer,
+.cc-profile-page {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .cc-admin-page,
 .cc-admin-page > div {
   min-width: 0;
   max-width: 100%;
+}
+
+.cc-cart-drawer {
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 767px) {
+  .cc-cart-drawer {
+    width: 100vw !important;
+    max-width: 100vw;
+  }
+
+  .cc-cart-header {
+    padding: 16px 14px !important;
+  }
+
+  .cc-cart-steps {
+    padding: 10px 14px !important;
+  }
+
+  .cc-drawer-scroll {
+    padding: 14px !important;
+    overscroll-behavior: contain;
+  }
+
+  .cc-cart-footer {
+    padding: 14px !important;
+  }
+
+  .cc-cart-delivery,
+  .cc-cart-form-grid,
+  .cc-cart-couriers {
+    grid-template-columns: 1fr !important;
+    flex-direction: column;
+  }
+
+  .cc-cart-crypto-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .cc-cart-payment-copy {
+    grid-template-columns: 48px minmax(0, 1fr) auto !important;
+    gap: 8px !important;
+  }
+
+  .cc-cart-item {
+    align-items: flex-start !important;
+    flex-wrap: wrap;
+    gap: 10px !important;
+  }
+
+  .cc-cart-item-controls {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 360px) {
+  .cc-cart-crypto-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 ::selection {
