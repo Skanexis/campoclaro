@@ -100,7 +100,7 @@ export const api = {
   beginCustomerTelegramLogin: () => request<TelegramLoginStart>('/api/customer/telegram/start', { method: 'POST', body: JSON.stringify({}) }),
   pollCustomerTelegramLogin: (requestId: string) => request<TelegramLoginStatus>(`/api/customer/telegram/status/${requestId}`),
   customerMe: () =>
-    request<{ user: null | { id: string; firstName?: string; lastName?: string; username?: string; photoUrl?: string } }>('/api/customer/me'),
+    request<{ user: null | { id: string; firstName?: string; lastName?: string; username?: string; photoUrl?: string; role?: string } }>('/api/customer/me'),
   customerOrders: () => request<Order[]>('/api/customer/orders'),
   devLogin: () => request('/api/auth/dev-login', { method: 'POST', body: JSON.stringify({}) }),
   logout: () => request('/api/auth/logout', { method: 'POST', body: JSON.stringify({}) }),

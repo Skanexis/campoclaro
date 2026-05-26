@@ -355,6 +355,9 @@ function completeTelegramLogin(scope, req, res) {
     res.cookie('cc_session', signSession(login.user), { httpOnly: true, sameSite: 'lax', maxAge: 7 * 86400 * 1000 })
   } else {
     res.cookie('cc_customer', signSession(login.user), { httpOnly: true, sameSite: 'lax', maxAge: 30 * 86400 * 1000 })
+    if (login.user.role === 'admin') {
+      res.cookie('cc_session', signSession(login.user), { httpOnly: true, sameSite: 'lax', maxAge: 7 * 86400 * 1000 })
+    }
   }
   return res.json({ status: 'complete', user: login.user })
 }
@@ -1016,7 +1019,8 @@ app.post('/api/telegram/webhook', async (req, res) => {
       await sendTelegramMessage(message.chat.id, 'Questo account Telegram non e autorizzato come admin.')
       return res.json({ ok: true })
     }
-    login.user = telegramUserFromMessage(message.from, login.scope === 'admin' ? 'admin' : 'customer')
+    const role = login.scope === 'admin' || adminIds.has(fromId) ? 'admin' : 'customer'
+    login.user = telegramUserFromMessage(message.from, role)
     await sendTelegramMessage(message.chat.id, 'Accesso confermato. Puoi tornare al sito.')
     return res.json({ ok: true })
   }
