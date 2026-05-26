@@ -141,7 +141,7 @@ export function Navbar() {
               justifyContent: 'center',
               transition: 'color 0.2s, background 0.2s, border-color 0.2s, box-shadow 0.2s',
             }}
-              className="flex"
+              className="hidden md:flex"
               onMouseEnter={e => {
                 e.currentTarget.style.color = '#050505'
                 e.currentTarget.style.background = '#D6B25E'
@@ -238,14 +238,14 @@ export function Navbar() {
             transition={{ duration: 0.25 }}
             style={{
               position: 'fixed',
-              top: 72,
+              top: 80,
               left: 0,
               right: 0,
               zIndex: 99,
               background: 'rgba(5,5,5,0.97)',
               backdropFilter: 'blur(24px)',
               borderBottom: '1px solid rgba(214,178,94,0.1)',
-              padding: '24px',
+              padding: '28px 24px 24px',
               display: 'flex',
               flexDirection: 'column',
               gap: 24,

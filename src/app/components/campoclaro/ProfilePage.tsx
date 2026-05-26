@@ -1,7 +1,7 @@
 import { type ReactElement, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { motion, AnimatePresence } from 'motion/react'
-import { User, Package, Settings, ChevronRight, Clock, Check, Truck, Shield } from 'lucide-react'
+import { User, Package, Settings, ChevronRight, Clock, Check, Truck, Shield, LogOut } from 'lucide-react'
 import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
 import { api, Order } from '../../lib/api'
 import { TelegramStartLogin } from './TelegramStartLogin'
@@ -269,6 +269,18 @@ export function ProfilePage() {
     }
   }
 
+  const logout = async () => {
+    await api.logout()
+    setActive('profile')
+    setUser(null)
+    setCustomerSignedIn(false)
+    setOrders([])
+    setNewsletterEnabled(false)
+    setNewsletterMessage('')
+    window.sessionStorage.removeItem('cc-telegram-login-customer')
+    window.sessionStorage.removeItem('cc-telegram-login-admin')
+  }
+
   const navItems = [
     { id: 'profile' as SidebarSection, label: 'Profilo', icon: <User size={16} /> },
     { id: 'orders' as SidebarSection, label: 'Ordini', icon: <Package size={16} /> },
@@ -327,7 +339,7 @@ export function ProfilePage() {
               }}>
                 <User size={16} color="#D6B25E" />
               </div>
-              <div>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.9rem', color: '#F5F5F5' }}>
                   {user?.firstName || user?.username || 'Utente'}
                 </div>
@@ -335,6 +347,16 @@ export function ProfilePage() {
                   {isAdmin ? 'Admin' : 'Membro'}
                 </div>
               </div>
+              {customerSignedIn && (
+                <button
+                  type="button"
+                  onClick={logout}
+                  aria-label="Logout"
+                  style={{ flexShrink: 0, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'rgba(245,245,245,0.55)', cursor: 'pointer' }}
+                >
+                  <LogOut size={15} />
+                </button>
+              )}
             </div>
 
             {/* Nav */}

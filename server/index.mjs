@@ -883,6 +883,7 @@ app.post('/api/auth/dev-login', (req, res) => {
 
 app.post('/api/auth/logout', (_req, res) => {
   res.clearCookie('cc_session')
+  res.clearCookie('cc_customer')
   res.json({ ok: true })
 })
 
