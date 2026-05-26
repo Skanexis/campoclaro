@@ -296,14 +296,25 @@ export function ProfilePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          style={{ marginBottom: 40 }}
+          style={{ marginBottom: 40, display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 16 }}
         >
-          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: '#D6B25E', marginBottom: 10 }}>
-            Area Privata
+          <div>
+            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: '#D6B25E', marginBottom: 10 }}>
+              Area Privata
+            </div>
+            <h1 style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', fontWeight: 700, color: '#F5F5F5', letterSpacing: '-0.02em', lineHeight: 1.1, margin: 0 }}>
+              Dashboard
+            </h1>
           </div>
-          <h1 style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', fontWeight: 700, color: '#F5F5F5', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-            Dashboard
-          </h1>
+          {customerSignedIn && (
+            <button
+              type="button"
+              onClick={logout}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'rgba(245,245,245,0.65)', cursor: 'pointer', fontSize: '0.78rem' }}
+            >
+              <LogOut size={15} /> Logout
+            </button>
+          )}
         </motion.div>
 
         {/* Layout */}
@@ -347,16 +358,6 @@ export function ProfilePage() {
                   {isAdmin ? 'Admin' : 'Membro'}
                 </div>
               </div>
-              {customerSignedIn && (
-                <button
-                  type="button"
-                  onClick={logout}
-                  aria-label="Logout"
-                  style={{ flexShrink: 0, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'rgba(245,245,245,0.55)', cursor: 'pointer' }}
-                >
-                  <LogOut size={15} />
-                </button>
-              )}
             </div>
 
             {/* Nav */}
