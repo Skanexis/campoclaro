@@ -87,7 +87,7 @@ export function Navbar() {
           </Link>
 
           {/* Desktop Links */}
-          <div style={{ display: 'flex', gap: 40, alignItems: 'center' }} className="hidden md:flex">
+          <div style={{ gap: 40, alignItems: 'center' }} className="hidden md:flex">
             {navLinks.map(link => (
               <Link
                 key={link.to}
@@ -136,7 +136,6 @@ export function Navbar() {
               color: isActive('/profilo') ? '#050505' : 'rgba(245,245,245,0.5)',
               background: isActive('/profilo') ? '#D6B25E' : 'rgba(255,255,255,0.03)',
               border: isActive('/profilo') ? '1px solid rgba(214,178,94,0.6)' : '1px solid rgba(255,255,255,0.08)',
-              display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               transition: 'color 0.2s, background 0.2s, border-color 0.2s, box-shadow 0.2s',

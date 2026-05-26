@@ -350,16 +350,16 @@ export function AdminPage() {
   return (
     <div className="cc-admin-page" style={{ minHeight: '100vh', padding: '96px 24px 80px' }}>
       <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 28 }}>
+        <div className="admin-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 28 }}>
           <div>
             <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: '#D6B25E', marginBottom: 10 }}>
               Back Office
             </div>
-            <h1 style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', color: '#F5F5F5', margin: 0 }}>
+            <h1 className="admin-title" style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', color: '#F5F5F5', margin: 0 }}>
               CAMPOCLARO Admin
             </h1>
           </div>
-          <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: 'rgba(245,245,245,0.65)', cursor: 'pointer' }}>
+          <button className="admin-logout" onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: 'rgba(245,245,245,0.65)', cursor: 'pointer' }}>
             <LogOut size={15} /> Logout
           </button>
         </div>
@@ -395,7 +395,7 @@ export function AdminPage() {
 
         {tab === 'orders' && (
           <motion.div className="admin-list" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ ...panel, overflow: 'hidden' }}>
-            <div style={{ position: 'sticky', top: 84, zIndex: 5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '12px 14px', background: 'rgba(5,5,5,0.86)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(18px)' }}>
+            <div className="admin-order-filters" style={{ position: 'sticky', top: 84, zIndex: 5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '12px 14px', background: 'rgba(5,5,5,0.86)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(18px)' }}>
               {[
                 ['all', 'Tutti'],
                 ['new', 'Nuovi'],
@@ -458,7 +458,7 @@ export function AdminPage() {
                     {order.address?.via || order.address?.city ? `${order.address.via || ''}, ${order.address.city || ''} ${order.address.cap || ''}` : 'Ritiro / dettagli privati'}
                     {order.address?.notes && <div>{order.address.notes}</div>}
                     {Number(order.fees || 0) > 0 && <div>Supplemento CCPP: €{order.fees}</div>}
-                    <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div className="admin-tracking-controls" style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <input
                         value={trackingDrafts[order.id] || ''}
                         onChange={e => setTrackingDrafts(prev => ({ ...prev, [order.id]: e.target.value }))}
@@ -496,7 +496,7 @@ export function AdminPage() {
                       )}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div className="admin-order-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <select value={order.status} onChange={e => updateOrderStatus(order.id, e.target.value)} style={{ background: '#111', color: '#F5F5F5', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '8px 10px' }}>
                       {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
@@ -832,12 +832,89 @@ export function AdminPage() {
 
       <style>{`
         @media (max-width: 860px) {
-          .admin-stats,
+          .cc-admin-page {
+            padding: 84px 12px calc(82px + env(safe-area-inset-bottom, 0px)) !important;
+            overflow-x: hidden;
+          }
+          .admin-header {
+            align-items: flex-start !important;
+            gap: 10px !important;
+            margin-bottom: 18px !important;
+          }
+          .admin-title {
+            font-size: clamp(1.35rem, 7.4vw, 1.8rem) !important;
+            line-height: 1.15 !important;
+          }
+          .admin-logout {
+            flex-shrink: 0;
+            padding: 9px 10px !important;
+            font-size: 0.76rem;
+          }
+          .admin-stats {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 8px !important;
+            margin-bottom: 14px !important;
+          }
+          .admin-stat-card {
+            min-height: 92px;
+            padding: 12px !important;
+          }
+          .admin-stat-card > div:first-child {
+            margin-bottom: 8px !important;
+          }
+          .admin-tabs {
+            box-sizing: border-box;
+            display: grid !important;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            width: 100% !important;
+            gap: 5px !important;
+            margin-bottom: 14px !important;
+            padding: 5px !important;
+            border-radius: 12px;
+            scrollbar-width: none;
+          }
+          .admin-tabs::-webkit-scrollbar {
+            display: none;
+          }
+          .admin-tab {
+            padding: 8px 12px !important;
+            font-size: 0.76rem;
+            text-align: center;
+          }
           .admin-row,
           .admin-products,
           .admin-filter-row,
           .admin-form {
             grid-template-columns: 1fr !important;
+          }
+          .admin-list-row {
+            padding: 12px !important;
+          }
+          .admin-order-filters {
+            top: 72px !important;
+            gap: 6px !important;
+            padding: 10px !important;
+          }
+          .admin-tracking-controls input {
+            flex-basis: 100%;
+            min-width: 0 !important;
+            width: 100%;
+          }
+          .admin-order-actions {
+            flex-wrap: wrap;
+            gap: 8px !important;
+            justify-content: space-between;
+          }
+          .admin-product-list {
+            max-height: 38vh;
+          }
+        }
+        @media (max-width: 340px) {
+          .admin-stats {
+            grid-template-columns: 1fr !important;
+          }
+          .admin-tabs {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
         }
       `}</style>
