@@ -379,16 +379,17 @@ function requireAdmin(req, res, next) {
 
 function normalizeProduct(input, existing = {}) {
   const prices = typeof input.prices === 'object' && input.prices ? input.prices : {}
+  const filters = Array.isArray(input.filters) ? input.filters.map(String).map(v => v.trim()).filter(Boolean) : existing.filters || []
   const fallbackId = String(input.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || nanoid(10)
   return {
     ...existing,
     id: String(input.id || existing.id || fallbackId).trim(),
     name: String(input.name || '').trim(),
-    category: String(input.category || '').trim(),
+    category: String(filters[0] || '').trim(),
     description: String(input.description || '').trim(),
     longDescription: String(input.longDescription || '').trim(),
     prices: Object.fromEntries(Object.entries(prices).map(([k, v]) => [String(k), Number(v)]).filter(([, v]) => Number.isFinite(v))),
-    filters: Array.isArray(input.filters) ? input.filters.map(String).map(v => v.trim()).filter(Boolean) : existing.filters || [],
+    filters,
     strains: Array.isArray(input.strains) ? input.strains.map(String).map(v => v.trim()).filter(Boolean) : existing.strains || [],
     thc: String(input.thc || '').trim(),
     cbd: String(input.cbd || '').trim(),
@@ -397,6 +398,15 @@ function normalizeProduct(input, existing = {}) {
     glowColor: String(input.glowColor || existing.glowColor || 'rgba(214,178,94,0.12)'),
     active: input.active !== false,
   }
+}
+
+function createProductId(name, products) {
+  const base = String(name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `product-${nanoid(8)}`
+  const ids = new Set(products.map(product => product.id))
+  if (!ids.has(base)) return base
+  let suffix = 2
+  while (ids.has(`${base}-${suffix}`)) suffix += 1
+  return `${base}-${suffix}`
 }
 
 function normalizeSiteContent(input = {}) {
@@ -918,7 +928,7 @@ app.get('/api/admin/products', requireAdmin, async (_req, res) => {
 
 app.post('/api/admin/products', requireAdmin, async (req, res) => {
   const products = await readJson(productsFile, [])
-  const product = normalizeProduct(req.body)
+  const product = normalizeProduct({ ...req.body, id: createProductId(req.body.name, products) })
   if (!product.name || Object.keys(product.prices).length === 0) return res.status(400).json({ error: 'Name and prices are required' })
   products.unshift(product)
   await writeJson(productsFile, products)

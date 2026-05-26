@@ -15,7 +15,7 @@ const EMPTY_PRODUCT: Product & { active?: boolean; originalId?: string } = {
   category: '',
   description: '',
   longDescription: '',
-  prices: { '1g': 0 },
+  prices: {},
   strains: [],
   thc: '',
   cbd: '',
@@ -23,6 +23,28 @@ const EMPTY_PRODUCT: Product & { active?: boolean; originalId?: string } = {
   gradient: 'linear-gradient(135deg, #1a1028 0%, #0a0f1f 60%, #050505 100%)',
   glowColor: 'rgba(214,178,94,0.12)',
   active: true,
+}
+
+function formatPrices(prices: Record<string, number>) {
+  return Object.entries(prices).map(([weight, price]) => `${weight}: ${price}`).join(', ')
+}
+
+function parsePrices(value: string) {
+  return Object.fromEntries(
+    value
+      .split(/[,;\n]+/)
+      .map(entry => entry.trim())
+      .filter(Boolean)
+      .map(entry => {
+        const match = entry.match(/^(.+?)\s*(?::|=|-|\s)\s*(?:EUR|€)?\s*(\d+(?:[.]\d+)?)\s*(?:EUR|€)?\s*$/i)
+        return match ? [match[1].trim(), Number(match[2])] : null
+      })
+      .filter((entry): entry is [string, number] => Boolean(entry && Number.isFinite(entry[1])))
+  )
+}
+
+function parseCommaList(value: string) {
+  return [...new Set(value.split(',').map(item => item.trim()).filter(Boolean))]
 }
 
 const PRODUCT_PRESETS = [
@@ -205,6 +227,7 @@ export function AdminPage() {
   const [products, setProducts] = useState<(Product & { active?: boolean })[]>([])
   const [siteContent, setSiteContent] = useState<SiteContent>(FALLBACK_SITE_CONTENT)
   const [editing, setEditing] = useState<Product & { active?: boolean; originalId?: string }>(EMPTY_PRODUCT)
+  const [pricesInput, setPricesInput] = useState('')
   const [message, setMessage] = useState('')
   const [newsletterTitle, setNewsletterTitle] = useState('')
   const [newsletterBody, setNewsletterBody] = useState('')
@@ -241,11 +264,20 @@ export function AdminPage() {
 
   const saveProduct = async () => {
     setMessage('')
-    await api.saveSiteContent(siteContent)
-    const saved = await api.saveProduct(editing)
-    setMessage('Prodotto salvato')
-    setEditing(saved)
-    await loadAdmin()
+    if (Object.keys(editing.prices).length === 0) {
+      setMessage('Inserisci i prezzi, ad esempio: 100g: 500, 500g: 2400')
+      return
+    }
+    try {
+      await api.saveSiteContent(siteContent)
+      const saved = await api.saveProduct(editing)
+      setMessage('Prodotto salvato')
+      setEditing(saved)
+      setPricesInput(formatPrices(saved.prices))
+      await loadAdmin()
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Salvataggio non riuscito')
+    }
   }
 
   const saveSiteContent = async () => {
@@ -306,8 +338,19 @@ export function AdminPage() {
 
   const deleteProduct = async (id: string) => {
     await api.deleteProduct(id)
-    setEditing(EMPTY_PRODUCT)
+    setEditing({ ...EMPTY_PRODUCT })
+    setPricesInput('')
     await loadAdmin()
+  }
+
+  const startNewProduct = () => {
+    setEditing({ ...EMPTY_PRODUCT, prices: {}, strains: [], tags: [] })
+    setPricesInput('')
+  }
+
+  const selectProduct = (product: Product & { active?: boolean }) => {
+    setEditing({ ...product, originalId: product.id })
+    setPricesInput(formatPrices(product.prices))
   }
 
   const updateOrderStatus = async (id: string, status: string) => {
@@ -538,40 +581,45 @@ export function AdminPage() {
         {tab === 'products' && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 18 }} className="admin-products">
             <div className="admin-product-list" style={{ ...panel, overflow: 'hidden' }}>
-              <button onClick={() => setEditing(EMPTY_PRODUCT)} style={{ width: '100%', padding: 14, background: 'rgba(214,178,94,0.08)', border: 'none', color: '#D6B25E', cursor: 'pointer', textAlign: 'left' }}>
+              <button onClick={startNewProduct} style={{ width: '100%', padding: 14, background: 'rgba(214,178,94,0.08)', border: 'none', color: '#D6B25E', cursor: 'pointer', textAlign: 'left' }}>
                 + Nuovo prodotto
               </button>
               {sortedProducts.map(product => (
-                <button key={product.id} className="admin-product-item" onClick={() => setEditing({ ...product, originalId: product.id })} style={{ width: '100%', padding: 14, background: (editing.originalId || editing.id) === product.id ? 'rgba(255,255,255,0.06)' : 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,0.05)', color: '#F5F5F5', cursor: 'pointer', textAlign: 'left' }}>
+                <button key={product.id} className="admin-product-item" onClick={() => selectProduct(product)} style={{ width: '100%', padding: 14, background: (editing.originalId || editing.id) === product.id ? 'rgba(255,255,255,0.06)' : 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,0.05)', color: '#F5F5F5', cursor: 'pointer', textAlign: 'left' }}>
                   <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700 }}>{product.name}</div>
-                  <div style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.34)', fontSize: '0.74rem', marginTop: 4 }}>{product.category}</div>
+                  <div style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.34)', fontSize: '0.74rem', marginTop: 4 }}>
+                    {(product.filters || []).join(', ') || 'Senza filtri'}
+                  </div>
                 </button>
               ))}
             </div>
 
             <div className="admin-form-panel" style={{ ...panel, padding: 18 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }} className="admin-form">
-                <Field label="ID prodotto" value={editing.id} onChange={v => setEditing(p => ({ ...p, id: v }))} />
                 <Field label="Nome" value={editing.name} onChange={v => setEditing(p => ({ ...p, name: v }))} />
-                <Field label="Categoria" value={editing.category} onChange={v => setEditing(p => ({ ...p, category: v }))} />
-                <Field label="Prezzi JSON" value={JSON.stringify(editing.prices)} onChange={v => {
-                  try { setEditing(p => ({ ...p, prices: JSON.parse(v) })) } catch {}
+                <Field label="Prezzi (es. 100g: 500, 500g: 2400)" value={pricesInput} onChange={v => {
+                  setPricesInput(v)
+                  setEditing(p => ({ ...p, prices: parsePrices(v) }))
                 }} />
-                <Field label="Strains" value={(editing.strains || []).join(', ')} onChange={v => setEditing(p => ({ ...p, strains: v.split(',').map(s => s.trim()).filter(Boolean) }))} />
+                <Field label="Strains (separati da virgola)" value={(editing.strains || []).join(', ')} onChange={v => setEditing(p => ({ ...p, strains: parseCommaList(v) }))} />
                 <Field label="Card badges max 2" value={editing.tags.slice(0, 2).join(', ')} onChange={v => setEditing(p => ({ ...p, tags: v.split(',').map(s => s.trim()).filter(Boolean).slice(0, 2) }))} />
+                <div style={{ gridColumn: '1 / -1', fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.36)' }}>
+                  {editing.id ? `ID: ${editing.id}` : 'ID viene creato automaticamente dal nome al salvataggio.'}
+                </div>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.35)', marginBottom: 10 }}>
                     Visual preset
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(118px, 1fr))', gap: 10 }}>
+                  <div className="admin-preset-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(88px, 1fr))', gap: 8 }}>
                   {PRODUCT_PRESETS.map(preset => (
                     <button
+                      className="admin-preset"
                       key={preset.label}
                       type="button"
                       onClick={() => setEditing(p => ({ ...p, gradient: preset.gradient, glowColor: preset.glowColor }))}
                       style={{
-                        minHeight: 74,
-                        padding: 12,
+                        minHeight: 54,
+                        padding: 9,
                         background: preset.gradient,
                         border: editing.gradient === preset.gradient ? '1px solid rgba(214,178,94,0.75)' : '1px solid rgba(255,255,255,0.12)',
                         borderRadius: 8,
@@ -581,10 +629,10 @@ export function AdminPage() {
                         boxShadow: editing.gradient === preset.gradient ? `0 0 30px ${preset.glowColor}` : 'none',
                       }}
                     >
-                      <span style={{ display: 'block', fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.92rem', marginBottom: 18 }}>
+                      <span style={{ display: 'block', fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.8rem', marginBottom: 10 }}>
                         {preset.label}
                       </span>
-                      <span style={{ display: 'block', width: 34, height: 3, borderRadius: 3, background: '#D6B25E', opacity: 0.75 }} />
+                      <span style={{ display: 'block', width: 24, height: 2, borderRadius: 3, background: '#D6B25E', opacity: 0.75 }} />
                     </button>
                   ))}
                   </div>

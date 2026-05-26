@@ -141,7 +141,7 @@ function ProductCard({ product }: { product: Product }) {
             color: 'rgba(245,245,245,0.3)',
             marginBottom: 4,
           }}>
-            {product.category}
+            {(product.filters || []).join(' · ') || product.category}
           </div>
           <div style={{
             fontFamily: "'Satoshi', sans-serif",
@@ -322,11 +322,11 @@ export function CatalogPage() {
   const categories = ['Tutti', ...siteContent.productFilters]
 
   const filtered = products
-    .filter(p => activeCategory === 'Tutti' || (p.filters?.length ? p.filters.includes(activeCategory) : p.category.includes(activeCategory)))
+    .filter(p => activeCategory === 'Tutti' || (p.filters || []).includes(activeCategory))
     .filter(p => {
       const value = query.trim().toLowerCase()
       if (!value) return true
-      return [p.name, p.category, p.description, ...(p.tags || []), ...(p.strains || [])].join(' ').toLowerCase().includes(value)
+      return [p.name, ...(p.filters || []), p.description, ...(p.tags || []), ...(p.strains || [])].join(' ').toLowerCase().includes(value)
     })
     .sort((a, b) => {
       if (sortBy === 'price-asc') return Object.values(a.prices)[0] - Object.values(b.prices)[0]
