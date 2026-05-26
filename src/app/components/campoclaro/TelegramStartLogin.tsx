@@ -12,14 +12,20 @@ export function TelegramStartLogin({
   onAuthenticated: (user?: { id: string; firstName?: string; lastName?: string; username?: string }) => void | Promise<void>
   compact?: boolean
 }) {
-  const [requestId, setRequestId] = useState('')
-  const [waiting, setWaiting] = useState(false)
+  const storageKey = `cc-telegram-login-${scope}`
+  const [requestId, setRequestId] = useState(() => window.sessionStorage.getItem(storageKey) || '')
+  const [waiting, setWaiting] = useState(() => Boolean(window.sessionStorage.getItem(storageKey)))
   const [error, setError] = useState('')
   const onAuthenticatedRef = useRef(onAuthenticated)
 
   useEffect(() => {
     onAuthenticatedRef.current = onAuthenticated
   }, [onAuthenticated])
+
+  useEffect(() => {
+    if (requestId) window.sessionStorage.setItem(storageKey, requestId)
+    else window.sessionStorage.removeItem(storageKey)
+  }, [requestId, storageKey])
 
   useEffect(() => {
     if (!requestId) return
@@ -54,18 +60,14 @@ export function TelegramStartLogin({
 
   const openTelegram = async () => {
     setError('')
-    const telegramWindow = window.open('about:blank', '_blank')
-    if (telegramWindow) telegramWindow.opener = null
     try {
       const result = scope === 'admin'
         ? await api.beginAdminTelegramLogin()
         : await api.beginCustomerTelegramLogin()
       setRequestId(result.requestId)
       setWaiting(true)
-      if (telegramWindow) telegramWindow.location.href = result.botUrl
-      else window.location.href = result.botUrl
+      window.location.assign(result.botUrl)
     } catch (err) {
-      telegramWindow?.close()
       setError(err instanceof Error ? err.message : 'Accesso Telegram non disponibile')
     }
   }
@@ -94,7 +96,7 @@ export function TelegramStartLogin({
       </button>
       {waiting && (
         <div style={{ marginTop: 8, fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.45)' }}>
-          Apri Telegram, premi Start e torna qui.
+          Premi Start nel bot, poi torna su questa pagina.
         </div>
       )}
       {error && (
