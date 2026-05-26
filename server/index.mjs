@@ -236,14 +236,19 @@ async function notifyAdmins(order, reason = 'Nuovo ordine') {
     lines.push('', '<b>Wallet usato</b>', escapeHtml(order.cryptoWallet))
   }
 
-  lines.push('', 'Per inviare il tracking al cliente, rispondi con il codice. Puoi anche scrivere: UPS 1Z..., InPost ..., SEUR ..., GLS ...')
+  if (!isMeetup) {
+    lines.push('', 'Per inviare il tracking al cliente, rispondi con il codice. Puoi anche scrivere: UPS 1Z..., InPost ..., SEUR ..., GLS ...')
+  }
 
   const orders = await readJson(ordersFile, [])
   const storedOrder = orders.find(item => item.id === order.id)
   for (const adminId of adminIds) {
     const message = await sendTelegramMessage(adminId, lines.filter(Boolean).join('\n'), {
       reply_markup: {
-        inline_keyboard: [
+        inline_keyboard: isMeetup ? [[
+          { text: 'Approvato', callback_data: `cc:processing:${order.id}` },
+          { text: 'Cancellato', callback_data: `cc:cancelled:${order.id}` },
+        ]] : [
           [
             { text: 'Pagato', callback_data: `cc:paid:${order.id}` },
             { text: 'In lavoro', callback_data: `cc:processing:${order.id}` },
@@ -675,6 +680,7 @@ async function applyAdminOrderAction(orderId, action) {
   const orders = await readJson(ordersFile, [])
   const order = orders.find(item => item.id === orderId)
   if (!order) return null
+  if (order.delivery === 'meetup' && !['processing', 'cancelled'].includes(action)) return null
 
   if (action === 'paid') {
     order.paymentStatus = 'paid_confirmed'
@@ -692,9 +698,13 @@ async function applyAdminOrderAction(orderId, action) {
   if (order.notificationsEnabled !== false && order.customer?.id) {
     const messages = {
       paid: `Pagamento confermato per ordine <b>${escapeHtml(order.id)}</b>.`,
-      processing: `Ordine <b>${escapeHtml(order.id)}</b> in lavorazione.`,
+      processing: order.delivery === 'meetup'
+        ? `Meetup <b>${escapeHtml(order.id)}</b> approvato.`
+        : `Ordine <b>${escapeHtml(order.id)}</b> in lavorazione.`,
       completed: `Ordine <b>${escapeHtml(order.id)}</b> completato.`,
-      cancelled: `Ordine <b>${escapeHtml(order.id)}</b> annullato. Contattaci su Telegram per dettagli.`,
+      cancelled: order.delivery === 'meetup'
+        ? `Meetup <b>${escapeHtml(order.id)}</b> cancellato. Contattaci su Telegram per dettagli.`
+        : `Ordine <b>${escapeHtml(order.id)}</b> annullato. Contattaci su Telegram per dettagli.`,
     }
     await sendTelegramMessage(order.customer.id, messages[action] || `Aggiornamento ordine <b>${escapeHtml(order.id)}</b>.`)
   }
@@ -973,10 +983,18 @@ app.patch('/api/admin/orders/:id', requireAdmin, async (req, res) => {
   const order = orders.find(item => item.id === req.params.id)
   if (!order) return res.status(404).json({ error: 'Order not found' })
 
+  if (order.delivery === 'meetup' && (req.body.trackingNumber !== undefined || req.body.trackingProvider !== undefined)) {
+    return res.status(400).json({ error: 'Tracking is not available for meetup orders' })
+  }
   if (req.body.status !== undefined) {
-    const updated = await applyAdminOrderAction(req.params.id, String(req.body.status || order.status))
+    const nextStatus = String(req.body.status || order.status)
+    const allowedStatuses = order.delivery === 'meetup'
+      ? ['processing', 'cancelled']
+      : ['new', 'processing', 'shipped', 'completed', 'cancelled']
+    if (!allowedStatuses.includes(nextStatus)) return res.status(400).json({ error: 'Invalid status for delivery method' })
+    const updated = await applyAdminOrderAction(req.params.id, nextStatus)
     if (updated && ['processing', 'completed', 'cancelled'].includes(String(req.body.status))) return res.json(updated)
-    order.status = String(req.body.status || order.status)
+    order.status = nextStatus
   }
   if (req.body.trackingNumber !== undefined) {
     const tracking = trackingInfo(String(req.body.trackingNumber || '').trim(), String(req.body.trackingProvider || order.courier || '').trim())
@@ -1038,9 +1056,12 @@ app.post('/api/telegram/webhook', async (req, res) => {
     const [, action, ...idParts] = data.split(':')
     const orderId = idParts.join(':')
     const order = await applyAdminOrderAction(orderId, action)
-    await answerTelegramCallback(callback.id, order ? 'Aggiornato' : 'Ordine non trovato')
+    await answerTelegramCallback(callback.id, order ? 'Aggiornato' : 'Azione non disponibile')
     if (order) {
-      await sendTelegramMessage(callback.message?.chat?.id || fromId, `<b>${escapeHtml(order.id)}</b> aggiornato: ${escapeHtml(order.status)}${order.paymentStatus ? ` · ${escapeHtml(order.paymentStatus)}` : ''}`)
+      const statusLabel = order.delivery === 'meetup'
+        ? ({ processing: 'Approvato', shipped: 'Approvato', completed: 'Approvato', cancelled: 'Cancellato' }[order.status] || order.status)
+        : order.status
+      await sendTelegramMessage(callback.message?.chat?.id || fromId, `<b>${escapeHtml(order.id)}</b> aggiornato: ${escapeHtml(statusLabel)}${order.paymentStatus ? ` · ${escapeHtml(order.paymentStatus)}` : ''}`)
     }
     return res.json({ ok: true })
   }
@@ -1057,6 +1078,10 @@ app.post('/api/telegram/webhook', async (req, res) => {
     )
   )
   if (!order) return res.json({ ok: true })
+  if (order.delivery === 'meetup') {
+    await sendTelegramMessage(message.chat.id, 'Per meetup usa solo Approvato o Cancellato.')
+    return res.json({ ok: true })
+  }
 
   const info = trackingInfo(trackingNumber, order.courier || '')
   order.trackingNumber = info.trackingNumber

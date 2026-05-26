@@ -76,6 +76,14 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Annullato',
 }
 
+const MEETUP_STATUS_LABELS: Record<string, string> = {
+  new: 'In attesa',
+  processing: 'Approvato',
+  shipped: 'Approvato',
+  completed: 'Approvato',
+  cancelled: 'Cancellato',
+}
+
 const STATUS_STYLES: Record<string, { color: string; bg: string; border: string }> = {
   new: { color: '#F0C96A', bg: 'rgba(214,178,94,0.1)', border: 'rgba(214,178,94,0.32)' },
   processing: { color: '#7DD3C7', bg: 'rgba(38,178,165,0.1)', border: 'rgba(38,178,165,0.28)' },
@@ -129,7 +137,7 @@ function Field({
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, meetup = false }: { status: string; meetup?: boolean }) {
   const style = STATUS_STYLES[status] || STATUS_STYLES.new
   return (
     <span style={{
@@ -147,7 +155,7 @@ function StatusBadge({ status }: { status: string }) {
       textTransform: 'uppercase',
       whiteSpace: 'nowrap',
     }}>
-      {STATUS_LABELS[status] || status}
+      {(meetup ? MEETUP_STATUS_LABELS[status] : STATUS_LABELS[status]) || status}
     </span>
   )
 }
@@ -431,7 +439,7 @@ export function AdminPage() {
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 5 }}>
                       <span style={{ fontFamily: "'JetBrains Mono', monospace", color: '#D6B25E' }}>{order.id}</span>
-                      <StatusBadge status={order.status} />
+                      <StatusBadge status={order.status} meetup={order.delivery === 'meetup'} />
                     </div>
                     <div style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.35)', fontSize: '0.76rem' }}>
                       {new Date(order.createdAt).toLocaleString('it-IT')} · {order.delivery} · {order.payment} · notifiche {order.notificationsEnabled === false ? 'off' : 'on'}
@@ -458,7 +466,7 @@ export function AdminPage() {
                     {order.address?.via || order.address?.city ? `${order.address.via || ''}, ${order.address.city || ''} ${order.address.cap || ''}` : 'Ritiro / dettagli privati'}
                     {order.address?.notes && <div>{order.address.notes}</div>}
                     {Number(order.fees || 0) > 0 && <div>Supplemento CCPP: €{order.fees}</div>}
-                    <div className="admin-tracking-controls" style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {order.delivery !== 'meetup' && <div className="admin-tracking-controls" style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <input
                         value={trackingDrafts[order.id] || ''}
                         onChange={e => setTrackingDrafts(prev => ({ ...prev, [order.id]: e.target.value }))}
@@ -494,18 +502,31 @@ export function AdminPage() {
                           <ExternalLink size={13} /> {order.trackingProvider || 'Track'}
                         </a>
                       )}
-                    </div>
+                    </div>}
                   </div>
                   <div className="admin-order-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <select value={order.status} onChange={e => updateOrderStatus(order.id, e.target.value)} style={{ background: '#111', color: '#F5F5F5', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '8px 10px' }}>
-                      {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
-                    <button type="button" title="Completato" onClick={() => quickOrderStatus(order.id, 'completed')} style={{ width: 34, height: 34, borderRadius: 6, border: '1px solid rgba(76,175,125,0.28)', background: 'rgba(76,175,125,0.1)', color: '#6ECF95', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Check size={15} />
-                    </button>
-                    <button type="button" title="Annulla" onClick={() => quickOrderStatus(order.id, 'cancelled')} style={{ width: 34, height: 34, borderRadius: 6, border: '1px solid rgba(229,115,115,0.28)', background: 'rgba(229,115,115,0.1)', color: '#E57373', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <X size={15} />
-                    </button>
+                    {order.delivery === 'meetup' ? (
+                      <>
+                        <button type="button" onClick={() => quickOrderStatus(order.id, 'processing')} style={{ padding: '8px 11px', borderRadius: 6, border: '1px solid rgba(76,175,125,0.28)', background: 'rgba(76,175,125,0.1)', color: '#6ECF95', cursor: 'pointer' }}>
+                          Approvato
+                        </button>
+                        <button type="button" onClick={() => quickOrderStatus(order.id, 'cancelled')} style={{ padding: '8px 11px', borderRadius: 6, border: '1px solid rgba(229,115,115,0.28)', background: 'rgba(229,115,115,0.1)', color: '#E57373', cursor: 'pointer' }}>
+                          Cancellato
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <select value={order.status} onChange={e => updateOrderStatus(order.id, e.target.value)} style={{ background: '#111', color: '#F5F5F5', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '8px 10px' }}>
+                          {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
+                        <button type="button" title="Completato" onClick={() => quickOrderStatus(order.id, 'completed')} style={{ width: 34, height: 34, borderRadius: 6, border: '1px solid rgba(76,175,125,0.28)', background: 'rgba(76,175,125,0.1)', color: '#6ECF95', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Check size={15} />
+                        </button>
+                        <button type="button" title="Annulla" onClick={() => quickOrderStatus(order.id, 'cancelled')} style={{ width: 34, height: 34, borderRadius: 6, border: '1px solid rgba(229,115,115,0.28)', background: 'rgba(229,115,115,0.1)', color: '#E57373', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <X size={15} />
+                        </button>
+                      </>
+                    )}
                     <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#D6B25E' }}>€{order.total}</div>
                   </div>
                 </div>

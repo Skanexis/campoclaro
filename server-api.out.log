@@ -296,3 +296,19 @@ Restarting 'server/index.mjs'
 ◇ injected env (7) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
 API listening on http://localhost:3001
 Completed running 'server/index.mjs'. Waiting for file changes before restarting...
+Restarting 'server/index.mjs'
+◇ injected env (7) from .env // tip: ⌘ suppress logs { quiet: true }
+API listening on http://localhost:3001
+Completed running 'server/index.mjs'. Waiting for file changes before restarting...
+Restarting 'server/index.mjs'
+◇ injected env (7) from .env // tip: ⌘ override existing { override: true }
+API listening on http://localhost:3001
+Completed running 'server/index.mjs'. Waiting for file changes before restarting...
+Restarting 'server/index.mjs'
+◇ injected env (7) from .env // tip: ⌘ override existing { override: true }
+API listening on http://localhost:3001
+Completed running 'server/index.mjs'. Waiting for file changes before restarting...
+Restarting 'server/index.mjs'
+◇ injected env (7) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+API listening on http://localhost:3001
+Completed running 'server/index.mjs'. Waiting for file changes before restarting...

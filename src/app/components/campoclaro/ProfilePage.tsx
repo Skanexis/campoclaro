@@ -16,6 +16,14 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: ReactE
   cancelled: { label: 'Annullato', color: '#E57373', icon: <Clock size={12} /> },
 }
 
+const MEETUP_STATUS_CONFIG: Record<string, { label: string; color: string; icon: ReactElement }> = {
+  new: { label: 'In Attesa', color: 'rgba(245,245,245,0.4)', icon: <Clock size={12} /> },
+  processing: { label: 'Approvato', color: '#4CAF7D', icon: <Check size={12} /> },
+  shipped: { label: 'Approvato', color: '#4CAF7D', icon: <Check size={12} /> },
+  completed: { label: 'Approvato', color: '#4CAF7D', icon: <Check size={12} /> },
+  cancelled: { label: 'Cancellato', color: '#E57373', icon: <Clock size={12} /> },
+}
+
 function TransitBadge({ label }: { label: string }) {
   return (
     <div className="transit-badge">
@@ -37,7 +45,7 @@ function OrderTimeline({ order }: { order: Order }) {
   ]
 
   return (
-    <div style={{ display: 'flex', gap: 0, marginTop: 16 }}>
+    <div className="profile-order-timeline" style={{ display: 'flex', gap: 0, marginTop: 16 }}>
       {steps.map((step, i) => (
         <div key={step.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
           {i < steps.length - 1 && (
@@ -80,11 +88,13 @@ function OrderTimeline({ order }: { order: Order }) {
 
 function OrderCard({ order }: { order: Order }) {
   const [expanded, setExpanded] = useState(false)
-  const status = STATUS_CONFIG[order.status] || STATUS_CONFIG.new
+  const statuses = order.delivery === 'meetup' ? MEETUP_STATUS_CONFIG : STATUS_CONFIG
+  const status = statuses[order.status] || statuses.new
 
   return (
     <motion.div
       layout
+      className="profile-order-card"
       style={{
         background: 'rgba(255,255,255,0.02)',
         border: '1px solid rgba(255,255,255,0.06)',
@@ -94,6 +104,7 @@ function OrderCard({ order }: { order: Order }) {
       }}
     >
       <button
+        className="profile-order-header"
         onClick={() => setExpanded(v => !v)}
         style={{
           width: '100%',
@@ -117,7 +128,7 @@ function OrderCard({ order }: { order: Order }) {
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        <div className="profile-order-summary" style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           {order.status === 'shipped' ? (
             <TransitBadge label={status.label} />
           ) : (
@@ -155,7 +166,7 @@ function OrderCard({ order }: { order: Order }) {
             transition={{ duration: 0.25 }}
             style={{ overflow: 'hidden' }}
           >
-            <div style={{ padding: '0 20px 20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <div className="profile-order-details" style={{ padding: '0 20px 20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ paddingTop: 16, marginBottom: 12 }}>
                 {order.items.map((item, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -168,7 +179,7 @@ function OrderCard({ order }: { order: Order }) {
                   </div>
                 ))}
               </div>
-              <OrderTimeline order={order} />
+              {order.delivery !== 'meetup' && <OrderTimeline order={order} />}
               {order.trackingUrl && (
                 <a href={order.trackingUrl} target="_blank" rel="noreferrer" style={{
                   marginTop: 16,
@@ -289,25 +300,27 @@ export function ProfilePage() {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', paddingTop: 72 }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px 80px' }}>
+    <div className="cc-profile-page" style={{ minHeight: '100vh', paddingTop: 72 }}>
+      <div className="profile-container" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px 80px' }}>
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
+          className="profile-header"
           style={{ marginBottom: 40, display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 16 }}
         >
           <div>
             <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: '#D6B25E', marginBottom: 10 }}>
               Area Privata
             </div>
-            <h1 style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', fontWeight: 700, color: '#F5F5F5', letterSpacing: '-0.02em', lineHeight: 1.1, margin: 0 }}>
+            <h1 className="profile-title" style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', fontWeight: 700, color: '#F5F5F5', letterSpacing: '-0.02em', lineHeight: 1.1, margin: 0 }}>
               Dashboard
             </h1>
           </div>
           {customerSignedIn && (
             <button
+              className="profile-logout"
               type="button"
               onClick={logout}
               style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'rgba(245,245,245,0.65)', cursor: 'pointer', fontSize: '0.78rem' }}
@@ -361,7 +374,7 @@ export function ProfilePage() {
             </div>
 
             {/* Nav */}
-            <div style={{
+            <div className="profile-tabs" style={{
               background: 'rgba(255,255,255,0.02)',
               border: '1px solid rgba(255,255,255,0.05)',
               borderRadius: 8,
@@ -402,6 +415,7 @@ export function ProfilePage() {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.15 }}
+            className="profile-content"
           >
             {!customerSignedIn && <ProfileTelegramLogin onReady={loadDashboard} />}
             <AnimatePresence mode="wait">
@@ -414,7 +428,7 @@ export function ProfilePage() {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.25 }}
                 >
-                  <div style={{
+                  <div className="profile-account-panel" style={{
                     padding: '24px',
                     background: 'rgba(255,255,255,0.02)',
                     border: '1px solid rgba(255,255,255,0.05)',
@@ -424,7 +438,7 @@ export function ProfilePage() {
                     <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 20 }}>
                       Informazioni Account
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div className="profile-account-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                       {[
                         { label: 'Username', value: user?.username ? `@${user.username}` : user?.firstName || 'Utente' },
                         { label: 'Stato', value: customerSignedIn ? (isAdmin ? 'Admin' : 'Membro Attivo') : 'Non autenticato' },
@@ -449,7 +463,7 @@ export function ProfilePage() {
                   </div>
 
                   {/* Stats */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                  <div className="profile-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                     {[
                       { label: 'Spesa Totale', value: customerSignedIn ? `€${orderStats.total}` : '-' },
                       { label: 'Ordini Completati', value: customerSignedIn ? String(orderStats.completed) : '-' },
@@ -508,7 +522,7 @@ export function ProfilePage() {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.25 }}
                 >
-                  <div style={{
+                  <div className="profile-settings-panel" style={{
                     padding: '24px',
                     background: 'rgba(255,255,255,0.02)',
                     border: '1px solid rgba(255,255,255,0.05)',
@@ -539,6 +553,7 @@ export function ProfilePage() {
                     ].map((setting, i) => (
                       <div
                         key={i}
+                        className="profile-setting-row"
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -657,27 +672,112 @@ export function ProfilePage() {
       {/* Mobile: Tabs below header */}
       <style>{`
         @media (max-width: 768px) {
+          .cc-profile-page {
+            overflow-x: hidden;
+          }
+          .profile-container {
+            box-sizing: border-box;
+            max-width: 100% !important;
+            padding: 20px 12px calc(82px + env(safe-area-inset-bottom, 0px)) !important;
+          }
+          .profile-header {
+            align-items: flex-start !important;
+            gap: 10px !important;
+            margin-bottom: 18px !important;
+          }
+          .profile-title {
+            font-size: clamp(1.55rem, 9vw, 2rem) !important;
+          }
+          .profile-logout {
+            flex-shrink: 0;
+            padding: 9px 10px !important;
+          }
           .profile-grid {
             grid-template-columns: 1fr !important;
+            gap: 14px !important;
+            min-width: 0;
           }
           .profile-sidebar {
-            display: flex !important;
-            gap: 8px !important;
+            min-width: 0;
           }
           .profile-sidebar > div:first-child {
             display: none !important;
           }
-          .profile-sidebar > div:last-child {
-            display: flex !important;
-            flex-direction: row !important;
+          .profile-tabs {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             width: 100% !important;
             background: rgba(255,255,255,0.02) !important;
           }
-          .profile-sidebar > div:last-child button {
-            flex: 1 !important;
+          .profile-tabs button {
+            min-width: 0;
             justify-content: center !important;
             border-left: none !important;
             border-bottom: 2px solid transparent !important;
+            padding: 11px 8px !important;
+          }
+          .profile-content {
+            min-width: 0;
+          }
+          .profile-account-panel {
+            padding: 14px !important;
+            margin-bottom: 10px !important;
+          }
+          .profile-account-grid {
+            grid-template-columns: 1fr !important;
+            gap: 8px !important;
+          }
+          .profile-account-grid > div {
+            padding: 10px 12px !important;
+          }
+          .profile-account-grid > div > div:last-child {
+            overflow-wrap: anywhere;
+          }
+          .profile-stats {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 8px !important;
+          }
+          .profile-stats > div {
+            padding: 12px 8px !important;
+          }
+          .profile-stats > div:last-child {
+            grid-column: 1 / -1;
+          }
+          .profile-order-header {
+            align-items: flex-start !important;
+            flex-direction: column;
+            padding: 12px !important;
+          }
+          .profile-order-summary {
+            box-sizing: border-box;
+            justify-content: space-between;
+            width: 100%;
+            gap: 8px !important;
+          }
+          .profile-order-details {
+            padding: 0 12px 12px !important;
+          }
+          .profile-order-details a {
+            box-sizing: border-box;
+            max-width: 100%;
+            overflow-wrap: anywhere;
+          }
+          .profile-order-timeline {
+            gap: 4px !important;
+          }
+          .profile-settings-panel {
+            padding: 14px !important;
+          }
+          .profile-setting-row {
+            gap: 12px;
+          }
+          .profile-setting-row > div:first-child {
+            min-width: 0;
+          }
+        }
+        @media (max-width: 340px) {
+          .profile-stats {
+            grid-template-columns: 1fr !important;
           }
         }
         .transit-badge {
