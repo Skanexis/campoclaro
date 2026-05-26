@@ -5,6 +5,7 @@ import { X, Plus, Minus, Trash2, Truck, MapPin, ChevronRight, Check, ArrowLeft, 
 import { useCart } from '../../context/CartContext'
 import { api } from '../../lib/api'
 import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
+import { TelegramStartLogin } from './TelegramStartLogin'
 
 type DeliveryMethod = 'ship' | 'meetup'
 type PaymentMethod = 'crypto' | 'ccpp'
@@ -12,12 +13,6 @@ type CryptoCurrency = 'BTC' | 'ETH' | 'USDT_TRX'
 type Courier = 'UPS' | 'InPost' | 'SEUR' | 'GLS'
 type Step = 'cart' | 'payment' | 'confirm' | 'success'
 type TelegramCustomer = { id: string; firstName?: string; lastName?: string; username?: string }
-
-declare global {
-  interface Window {
-    onCheckoutTelegramAuth?: (user: unknown) => void
-  }
-}
 
 const CCPP_FEE = 50
 const COURIERS: Array<{ id: Courier; subtitle: string }> = [
@@ -230,20 +225,7 @@ export function CartDrawer() {
   const ccppFee = delivery === 'ship' && payMethod === 'ccpp' ? CCPP_FEE : 0
   const orderTotal = total + ccppFee
   const selectedCrypto = CRYPTO_WALLETS[cryptoCurrency]
-  const botName = import.meta.env.VITE_TELEGRAM_BOT_USERNAME
   const selectedWalletBusy = walletAvailability[cryptoCurrency]?.busy === true
-
-  useEffect(() => {
-    window.onCheckoutTelegramAuth = async user => {
-      setOrderError('')
-      try {
-        const { user: customer } = await api.customerTelegramLogin(user)
-        setTelegramCustomer(customer)
-      } catch (error) {
-        setOrderError(error instanceof Error ? error.message : 'Accesso Telegram non riuscito')
-      }
-    }
-  }, [])
 
   useEffect(() => {
     api.customerMe()
@@ -266,22 +248,6 @@ export function CartDrawer() {
       })
       .catch(() => {})
   }, [isOpen, cryptoCurrency])
-
-  useEffect(() => {
-    if (!botName || !isOpen || telegramCustomer || document.getElementById('telegram-checkout-script')) return
-    const slot = document.getElementById('telegram-checkout-slot')
-    if (!slot) return
-    const script = document.createElement('script')
-    script.id = 'telegram-checkout-script'
-    script.src = 'https://telegram.org/js/telegram-widget.js?22'
-    script.async = true
-    script.setAttribute('data-telegram-login', botName)
-    script.setAttribute('data-size', 'medium')
-    script.setAttribute('data-userpic', 'false')
-    script.setAttribute('data-request-access', 'write')
-    script.setAttribute('data-onauth', 'onCheckoutTelegramAuth(user)')
-    slot.appendChild(script)
-  }, [botName, isOpen, telegramCustomer])
 
   useEffect(() => {
     if (!lastOrder?.id || step !== 'success') return
@@ -634,12 +600,14 @@ export function CartDrawer() {
                             <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: '#D6B25E' }}>
                               Autorizzato: {telegramCustomer.username ? `@${telegramCustomer.username}` : [telegramCustomer.firstName, telegramCustomer.lastName].filter(Boolean).join(' ')}
                             </div>
-                          ) : botName ? (
-                            <div id="telegram-checkout-slot" style={{ minHeight: 32 }} />
                           ) : (
-                            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.73rem', color: 'rgba(245,245,245,0.35)' }}>
-                              Accesso non disponibile: configura VITE_TELEGRAM_BOT_USERNAME.
-                            </div>
+                            <TelegramStartLogin
+                              compact
+                              scope="customer"
+                              onAuthenticated={user => {
+                                if (user) setTelegramCustomer(user)
+                              }}
+                            />
                           )}
                         </div>
 

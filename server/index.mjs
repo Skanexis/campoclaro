@@ -87,6 +87,9 @@ let cryptoRateCache = { at: 0, rates: null }
 const telegramApiBase = process.env.TELEGRAM_BOT_TOKEN
   ? `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`
   : ''
+const telegramBotUsername = String(process.env.TELEGRAM_BOT_USERNAME || process.env.VITE_TELEGRAM_BOT_USERNAME || '').trim().replace(/^@/, '')
+const telegramLoginTtlMs = 10 * 60 * 1000
+const telegramLoginRequests = new Map()
 
 function escapeHtml(value) {
   return String(value || '')
@@ -304,23 +307,56 @@ function readCustomerSession(req) {
   return JSON.parse(Buffer.from(body, 'base64url').toString('utf8'))
 }
 
-function verifyTelegramAuth(authData = {}) {
-  if (!process.env.TELEGRAM_BOT_TOKEN) {
-    throw new Error('TELEGRAM_BOT_TOKEN is not configured')
+function telegramUserFromMessage(from, role) {
+  return {
+    id: String(from.id),
+    firstName: from.first_name || '',
+    lastName: from.last_name || '',
+    username: from.username || '',
+    photoUrl: '',
+    role,
   }
+}
 
-  const { hash, ...data } = authData
-  if (!hash || !data.id || !data.auth_date) return false
-  const checkString = Object.keys(data)
-    .sort()
-    .map(key => `${key}=${data[key]}`)
-    .join('\n')
-  const secretKey = crypto.createHash('sha256').update(process.env.TELEGRAM_BOT_TOKEN).digest()
-  const expected = crypto.createHmac('sha256', secretKey).update(checkString).digest('hex')
+function beginTelegramLogin(scope, res) {
+  if (!telegramApiBase || !telegramBotUsername) {
+    return res.status(503).json({ error: 'Configura TELEGRAM_BOT_TOKEN e TELEGRAM_BOT_USERNAME' })
+  }
+  if (!process.env.TELEGRAM_WEBHOOK_SECRET) {
+    return res.status(503).json({ error: 'Configura TELEGRAM_WEBHOOK_SECRET per autorizzare tramite /start' })
+  }
+  if (scope === 'admin' && adminIds.size === 0) {
+    return res.status(503).json({ error: 'Configura ADMIN_TELEGRAM_IDS' })
+  }
+  const now = Date.now()
+  for (const [id, login] of telegramLoginRequests) {
+    if (login.expiresAt <= now) telegramLoginRequests.delete(id)
+  }
+  const requestId = `cc_${scope === 'admin' ? 'a' : 'c'}_${nanoid(32)}`
+  const expiresAt = now + telegramLoginTtlMs
+  telegramLoginRequests.set(requestId, { scope, expiresAt, user: null })
+  return res.json({
+    requestId,
+    botUrl: `https://t.me/${telegramBotUsername}?start=${requestId}`,
+    expiresAt: new Date(expiresAt).toISOString(),
+  })
+}
 
-  if (hash.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expected))) return false
-  const authAge = Math.floor(Date.now() / 1000) - Number(data.auth_date || 0)
-  return authAge >= 0 && authAge < 86400
+function completeTelegramLogin(scope, req, res) {
+  const login = telegramLoginRequests.get(req.params.requestId)
+  if (!login || login.scope !== scope || login.expiresAt <= Date.now()) {
+    telegramLoginRequests.delete(req.params.requestId)
+    return res.status(404).json({ error: 'Link Telegram scaduto. Riprova.' })
+  }
+  if (!login.user) return res.json({ status: 'pending' })
+
+  telegramLoginRequests.delete(req.params.requestId)
+  if (scope === 'admin') {
+    res.cookie('cc_session', signSession(login.user), { httpOnly: true, sameSite: 'lax', maxAge: 7 * 86400 * 1000 })
+  } else {
+    res.cookie('cc_customer', signSession(login.user), { httpOnly: true, sameSite: 'lax', maxAge: 30 * 86400 * 1000 })
+  }
+  return res.json({ status: 'complete', user: login.user })
 }
 
 function requireAdmin(req, res, next) {
@@ -784,45 +820,20 @@ app.post('/api/orders/:id/crypto-paid', async (req, res) => {
   res.json(order)
 })
 
-app.post('/api/auth/telegram', (req, res) => {
-  try {
-    if (!verifyTelegramAuth(req.body)) return res.status(401).json({ error: 'Invalid Telegram signature' })
-    if (!adminIds.has(String(req.body.id))) return res.status(403).json({ error: 'Telegram account is not an admin' })
-    const user = {
-      id: String(req.body.id),
-      firstName: req.body.first_name || '',
-      lastName: req.body.last_name || '',
-      username: req.body.username || '',
-      photoUrl: req.body.photo_url || '',
-      role: 'admin',
-    }
-    res.cookie('cc_session', signSession(user), { httpOnly: true, sameSite: 'lax', maxAge: 7 * 86400 * 1000 })
-    res.json({ user })
-  } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
+app.post('/api/auth/telegram/start', (_req, res) => {
+  beginTelegramLogin('admin', res)
 })
 
-app.post('/api/customer/telegram', (req, res) => {
-  try {
-    if (!verifyTelegramAuth(req.body)) return res.status(401).json({ error: 'Invalid Telegram signature' })
-    const user = {
-      id: String(req.body.id),
-      firstName: req.body.first_name || '',
-      lastName: req.body.last_name || '',
-      username: req.body.username || '',
-      photoUrl: req.body.photo_url || '',
-      role: 'customer',
-    }
-    res.cookie('cc_customer', signSession(user), {
-      httpOnly: true,
-      sameSite: 'lax',
-      maxAge: 30 * 86400 * 1000,
-    })
-    res.json({ user })
-  } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
+app.get('/api/auth/telegram/status/:requestId', (req, res) => {
+  completeTelegramLogin('admin', req, res)
+})
+
+app.post('/api/customer/telegram/start', (_req, res) => {
+  beginTelegramLogin('customer', res)
+})
+
+app.get('/api/customer/telegram/status/:requestId', (req, res) => {
+  completeTelegramLogin('customer', req, res)
 })
 
 app.get('/api/customer/me', (req, res) => {
@@ -986,6 +997,30 @@ app.post('/api/telegram/webhook', async (req, res) => {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
+  const message = req.body?.message
+  const fromId = String(message?.from?.id || '')
+  const startMatch = String(message?.text || '').trim().match(/^\/start(?:@\w+)?(?:\s+([A-Za-z0-9_-]+))?$/)
+  if (startMatch) {
+    const requestId = startMatch[1]
+    if (!requestId) {
+      await sendTelegramMessage(message.chat.id, 'Per accedere, apri il sito e premi "Accedi tramite bot".')
+      return res.json({ ok: true })
+    }
+    const login = requestId ? telegramLoginRequests.get(requestId) : null
+    if (!login || login.expiresAt <= Date.now()) {
+      if (requestId) telegramLoginRequests.delete(requestId)
+      await sendTelegramMessage(message.chat.id, 'Link di accesso scaduto. Torna al sito e richiedi un nuovo accesso.')
+      return res.json({ ok: true })
+    }
+    if (login.scope === 'admin' && !adminIds.has(fromId)) {
+      await sendTelegramMessage(message.chat.id, 'Questo account Telegram non e autorizzato come admin.')
+      return res.json({ ok: true })
+    }
+    login.user = telegramUserFromMessage(message.from, login.scope === 'admin' ? 'admin' : 'customer')
+    await sendTelegramMessage(message.chat.id, 'Accesso confermato. Puoi tornare al sito.')
+    return res.json({ ok: true })
+  }
+
   const callback = req.body?.callback_query
   if (callback) {
     const fromId = String(callback.from?.id || '')
@@ -1005,10 +1040,8 @@ app.post('/api/telegram/webhook', async (req, res) => {
     return res.json({ ok: true })
   }
 
-  const message = req.body?.message
   const replyTo = message?.reply_to_message
   const trackingNumber = String(message?.text || '').trim()
-  const fromId = String(message?.from?.id || '')
   if (!replyTo || !trackingNumber || !adminIds.has(fromId)) return res.json({ ok: true })
 
   const orders = await readJson(ordersFile, [])

@@ -101,7 +101,7 @@ cd /opt/campoclaro
 
 ## 5. Create Production `.env`
 
-Copy the example:
+Docker Compose reads `/opt/campoclaro/.env`. The `.env.production.example` file is only a template for creating that real `.env` file once:
 
 ```bash
 cp .env.production.example .env
@@ -116,8 +116,9 @@ CAMPOCLARO_HOST_PORT=3101
 APP_ORIGIN=https://campoclaro.eu
 SESSION_SECRET=PASTE_RANDOM_SECRET_HERE
 TELEGRAM_BOT_TOKEN=PASTE_BOT_TOKEN_HERE
+TELEGRAM_BOT_USERNAME=your_bot_username_without_at
 ADMIN_TELEGRAM_IDS=123456789,987654321
-VITE_TELEGRAM_BOT_USERNAME=your_bot_username_without_at
+TELEGRAM_WEBHOOK_SECRET=PASTE_RANDOM_WEBHOOK_SECRET_HERE
 ```
 
 Generate a strong secret:
@@ -131,8 +132,9 @@ Notes:
 - `CAMPOCLARO_HOST_PORT=3101` is intentionally not `80` or `443`.
 - If another project already uses `3101`, choose another local port, for example `3102`, and update the Nginx config later.
 - `ADMIN_TELEGRAM_IDS` are numeric Telegram user IDs, comma-separated.
-- `VITE_TELEGRAM_BOT_USERNAME` is baked into the frontend during Docker build, so rebuild after changing it.
-- Telegram Login also requires the site domain to be linked to this bot. In `@BotFather`, select the bot, send `/setdomain`, and set `campoclaro.eu` before testing login on production.
+- `TELEGRAM_BOT_USERNAME` is the username without `@`; it must refer to the same bot as `TELEGRAM_BOT_TOKEN`.
+- Login uses a bot deep-link and the `/start` command, not Telegram's website login widget. `/setdomain` is not required.
+- `TELEGRAM_WEBHOOK_SECRET` must be a private random string, for example generated with `openssl rand -hex 32`.
 
 ## 6. Start Docker App
 
@@ -164,6 +166,19 @@ Expected:
 
 ```json
 {"ok":true}
+```
+
+Register the bot webhook after HTTPS is configured in step 8:
+
+```bash
+cd /opt/campoclaro
+set -a
+. ./.env
+set +a
+curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
+  -d "url=https://campoclaro.eu/api/telegram/webhook" \
+  -d "secret_token=${TELEGRAM_WEBHOOK_SECRET}"
+curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"
 ```
 
 ## 7. Configure Nginx

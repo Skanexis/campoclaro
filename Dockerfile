@@ -6,8 +6,6 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-ARG VITE_TELEGRAM_BOT_USERNAME
-ENV VITE_TELEGRAM_BOT_USERNAME=$VITE_TELEGRAM_BOT_USERNAME
 RUN npm run build
 
 FROM node:22-alpine AS production

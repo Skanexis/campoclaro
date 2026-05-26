@@ -4,14 +4,9 @@ import { motion, AnimatePresence } from 'motion/react'
 import { User, Package, Settings, ChevronRight, Clock, Check, Truck, Shield } from 'lucide-react'
 import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
 import { api, Order } from '../../lib/api'
+import { TelegramStartLogin } from './TelegramStartLogin'
 
 type SidebarSection = 'profile' | 'orders' | 'settings' | 'admin'
-
-declare global {
-  interface Window {
-    onProfileTelegramAuth?: (user: unknown) => void
-  }
-}
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: ReactElement }> = {
   completed: { label: 'Completato', color: '#4CAF7D', icon: <Check size={12} /> },
@@ -201,53 +196,15 @@ function OrderCard({ order }: { order: Order }) {
 }
 
 function ProfileTelegramLogin({ onReady }: { onReady: () => Promise<void> }) {
-  const [error, setError] = useState('')
-  const botName = import.meta.env.VITE_TELEGRAM_BOT_USERNAME
-
-  useEffect(() => {
-    window.onProfileTelegramAuth = async user => {
-      setError('')
-      try {
-        await api.customerTelegramLogin(user)
-        await onReady()
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Accesso Telegram non riuscito')
-      }
-    }
-
-    if (!botName || document.getElementById('telegram-profile-script')) return
-    const slot = document.getElementById('telegram-profile-slot')
-    if (!slot) return
-    const script = document.createElement('script')
-    script.id = 'telegram-profile-script'
-    script.src = 'https://telegram.org/js/telegram-widget.js?22'
-    script.async = true
-    script.setAttribute('data-telegram-login', botName)
-    script.setAttribute('data-size', 'large')
-    script.setAttribute('data-userpic', 'false')
-    script.setAttribute('data-request-access', 'write')
-    script.setAttribute('data-onauth', 'onProfileTelegramAuth(user)')
-    slot.appendChild(script)
-
-    return () => {
-      delete window.onProfileTelegramAuth
-    }
-  }, [botName, onReady])
-
   return (
     <div style={{ padding: '20px', background: 'rgba(214,178,94,0.04)', border: '1px solid rgba(214,178,94,0.14)', borderRadius: 8, marginBottom: 20 }}>
       <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: '1rem', fontWeight: 700, color: '#F5F5F5', marginBottom: 6 }}>
         Accedi con Telegram
       </div>
       <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.45)', lineHeight: 1.5, marginBottom: 14 }}>
-        Accedi per visualizzare ordini, tracking e preferenze reali.
+        Apri il bot, premi Start e visualizza ordini, tracking e preferenze reali.
       </div>
-      {botName ? (
-        <div id="telegram-profile-slot" style={{ minHeight: 44 }} />
-      ) : (
-        <div style={{ fontSize: '0.78rem', color: '#E57373' }}>Configura VITE_TELEGRAM_BOT_USERNAME e ricostruisci il frontend.</div>
-      )}
-      {error && <div style={{ marginTop: 10, color: '#E57373', fontSize: '0.78rem' }}>{error}</div>}
+      <TelegramStartLogin scope="customer" onAuthenticated={onReady} />
     </div>
   )
 }

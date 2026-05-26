@@ -5,12 +5,7 @@ import { BarChart3, Check, ExternalLink, LogOut, Mail, Package, Save, Send, Shop
 import { Product } from './data'
 import { api, Order, SiteContent } from '../../lib/api'
 import { FALLBACK_SITE_CONTENT } from '../../hooks/useSiteContent'
-
-declare global {
-  interface Window {
-    onTelegramAuth?: (user: unknown) => void
-  }
-}
+import { TelegramStartLogin } from './TelegramStartLogin'
 
 type AdminTab = 'orders' | 'products' | 'filters' | 'contacts' | 'newsletter'
 
@@ -157,33 +152,8 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function AdminLogin({ onReady }: { onReady: () => void }) {
+function AdminLogin({ onReady }: { onReady: () => void | Promise<void> }) {
   const [error, setError] = useState('')
-  const botName = import.meta.env.VITE_TELEGRAM_BOT_USERNAME
-
-  useEffect(() => {
-    window.onTelegramAuth = async user => {
-      setError('')
-      try {
-        await api.telegramLogin(user)
-        onReady()
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Telegram login failed')
-      }
-    }
-
-    if (!botName || document.getElementById('telegram-login-script')) return
-    const script = document.createElement('script')
-    script.id = 'telegram-login-script'
-    script.src = 'https://telegram.org/js/telegram-widget.js?22'
-    script.async = true
-    script.setAttribute('data-telegram-login', botName)
-    script.setAttribute('data-size', 'large')
-    script.setAttribute('data-userpic', 'false')
-    script.setAttribute('data-request-access', 'write')
-    script.setAttribute('data-onauth', 'onTelegramAuth(user)')
-    document.getElementById('telegram-login-slot')?.appendChild(script)
-  }, [botName, onReady])
 
   const devLogin = async () => {
     setError('')
@@ -203,11 +173,11 @@ function AdminLogin({ onReady }: { onReady: () => void }) {
           Admin
         </h1>
         <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.86rem', lineHeight: 1.6, color: 'rgba(245,245,245,0.42)', marginBottom: 22 }}>
-          Accesso tramite Telegram bot.
+          Apri il bot Telegram e premi Start per confermare il tuo account.
         </p>
-        <div id="telegram-login-slot" style={{ minHeight: 44, display: 'flex', justifyContent: 'center', marginBottom: 14 }} />
-        {!botName && (
-          <button onClick={devLogin} style={{ width: '100%', padding: '12px 16px', borderRadius: 6, border: 'none', background: 'linear-gradient(135deg, #D6B25E, #F0C96A)', color: '#050505', fontFamily: "'Inter', sans-serif", fontWeight: 700, cursor: 'pointer' }}>
+        <TelegramStartLogin scope="admin" onAuthenticated={onReady} />
+        {import.meta.env.DEV && (
+          <button onClick={devLogin} style={{ marginTop: 12, width: '100%', padding: '12px 16px', borderRadius: 6, border: 'none', background: 'rgba(255,255,255,0.08)', color: '#F5F5F5', fontFamily: "'Inter', sans-serif", fontWeight: 700, cursor: 'pointer' }}>
             Dev Login
           </button>
         )}

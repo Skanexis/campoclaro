@@ -62,6 +62,17 @@ export interface CryptoWalletAvailability {
   busy: boolean
 }
 
+export interface TelegramLoginStart {
+  requestId: string
+  botUrl: string
+  expiresAt: string
+}
+
+export interface TelegramLoginStatus {
+  status: 'pending' | 'complete'
+  user?: { id: string; firstName?: string; lastName?: string; username?: string; photoUrl?: string; role?: string }
+}
+
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(url, {
     credentials: 'include',
@@ -84,9 +95,10 @@ export const api = {
   reportCryptoPaid: (id: string, txHash = '') =>
     request<Order>(`/api/orders/${id}/crypto-paid`, { method: 'POST', body: JSON.stringify({ txHash }) }),
   me: () => request<{ user: null | { id: string; username?: string; firstName?: string; role?: string } }>('/api/auth/me'),
-  telegramLogin: (payload: unknown) => request('/api/auth/telegram', { method: 'POST', body: JSON.stringify(payload) }),
-  customerTelegramLogin: (payload: unknown) =>
-    request<{ user: { id: string; firstName?: string; lastName?: string; username?: string; photoUrl?: string } }>('/api/customer/telegram', { method: 'POST', body: JSON.stringify(payload) }),
+  beginAdminTelegramLogin: () => request<TelegramLoginStart>('/api/auth/telegram/start', { method: 'POST', body: JSON.stringify({}) }),
+  pollAdminTelegramLogin: (requestId: string) => request<TelegramLoginStatus>(`/api/auth/telegram/status/${requestId}`),
+  beginCustomerTelegramLogin: () => request<TelegramLoginStart>('/api/customer/telegram/start', { method: 'POST', body: JSON.stringify({}) }),
+  pollCustomerTelegramLogin: (requestId: string) => request<TelegramLoginStatus>(`/api/customer/telegram/status/${requestId}`),
   customerMe: () =>
     request<{ user: null | { id: string; firstName?: string; lastName?: string; username?: string; photoUrl?: string } }>('/api/customer/me'),
   customerOrders: () => request<Order[]>('/api/customer/orders'),
