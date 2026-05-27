@@ -323,7 +323,7 @@ function PriceEditor({
             Aggiungi almeno un formato e un prezzo.
           </div>
         ) : rows.map(([weight, price], index) => (
-          <div key={`${weight}-${index}`} className="admin-price-row" style={{ display: 'grid', gridTemplateColumns: '1fr minmax(110px, 0.7fr) auto', gap: 8 }}>
+          <div key={`price-row-${index}`} className="admin-price-row" style={{ display: 'grid', gridTemplateColumns: '1fr minmax(110px, 0.7fr) auto', gap: 8 }}>
             <input value={weight} placeholder="100g" onChange={event => updateRow(index, 'weight', event.target.value)} style={{ minWidth: 0, padding: '10px 12px', borderRadius: 6, color: '#F5F5F5', fontFamily: "'Inter', sans-serif", fontSize: '0.86rem' }} />
             <input type="number" min="0" step="1" value={Number.isFinite(price) ? price : ''} placeholder="500" onChange={event => updateRow(index, 'price', event.target.value)} style={{ minWidth: 0, padding: '10px 12px', borderRadius: 6, color: '#F5F5F5', fontFamily: "'Inter', sans-serif", fontSize: '0.86rem' }} />
             <button type="button" title="Rimuovi" onClick={() => setRows(rows.filter((_, i) => i !== index))} style={{ width: 40, borderRadius: 6, border: '1px solid rgba(229,115,115,0.24)', background: 'rgba(229,115,115,0.08)', color: '#E57373', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -345,7 +345,7 @@ function PriceEditor({
               + {weight}
             </button>
           ))}
-          <button type="button" onClick={() => onChange({ ...prices, [`Formato ${rows.length + 1}`]: 0 })} style={{ padding: '8px 11px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)', color: 'rgba(245,245,245,0.62)', cursor: 'pointer' }}>
+          <button type="button" onClick={() => onChange({ ...prices, [Object.prototype.hasOwnProperty.call(prices, '') ? `Formato ${rows.length + 1}` : '']: 0 })} style={{ padding: '8px 11px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)', color: 'rgba(245,245,245,0.62)', cursor: 'pointer' }}>
             + Altro
           </button>
         </div>
