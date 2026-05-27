@@ -932,6 +932,18 @@ export function AdminPage() {
           color: rgba(245,245,245,0.43);
           overflow-wrap: anywhere;
         }
+        .admin-order-card,
+        .admin-order-card-header > div:first-child,
+        .admin-order-sections,
+        .admin-order-info-card,
+        .admin-tracking-panel {
+          min-width: 0;
+        }
+        .admin-order-card-header span:first-child,
+        .admin-order-info-card,
+        .admin-order-item > span:first-child {
+          overflow-wrap: anywhere;
+        }
         .admin-orders-grid {
           gap: 8px !important;
           padding: 10px !important;
@@ -1079,11 +1091,36 @@ export function AdminPage() {
             top: 72px !important;
             gap: 6px !important;
             padding: 10px !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto;
+            scrollbar-width: none;
+          }
+          .admin-order-filters::-webkit-scrollbar {
+            display: none;
+          }
+          .admin-order-filters button {
+            flex: 0 0 auto;
+          }
+          .admin-tracking-controls {
+            display: grid !important;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            align-items: stretch !important;
           }
           .admin-tracking-controls input {
-            flex-basis: 100%;
+            grid-column: 1 / -1;
             min-width: 0 !important;
             width: 100%;
+            box-sizing: border-box;
+          }
+          .admin-tracking-controls button {
+            width: 100%;
+            min-width: 0;
+            padding-left: 4px !important;
+            padding-right: 4px !important;
+          }
+          .admin-tracking-controls a {
+            grid-column: 1 / -1;
+            padding-top: 4px;
           }
           .admin-order-footer {
             justify-content: stretch !important;
@@ -1093,6 +1130,28 @@ export function AdminPage() {
           }
           .admin-product-list {
             max-height: 38vh;
+          }
+        }
+        @media (max-width: 560px) {
+          .cc-admin-page {
+            padding-left: 8px !important;
+            padding-right: 8px !important;
+          }
+          .admin-order-filters {
+            margin: 0 -1px;
+            padding-left: 8px !important;
+            padding-right: 8px !important;
+          }
+          .admin-order-footer {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .admin-order-footer select {
+            grid-column: 1 / -1;
+            width: 100%;
+          }
+          .admin-order-footer button {
+            width: 100% !important;
           }
         }
         @media (max-width: 420px) {
