@@ -160,6 +160,10 @@ function cryptoAmountForEur(totalEur, currency, rate) {
   return (Math.ceil(raw * factor) / factor).toFixed(meta.displayDecimals)
 }
 
+function meetupDepositForTotal(totalEur) {
+  return Math.max(0, Math.floor(Number(totalEur || 0) * meetupDepositRate))
+}
+
 function cryptoPaymentUri(currency, address, amount) {
   if (currency === 'BTC') return `bitcoin:${address}?amount=${amount}`
   if (currency === 'ETH') return `ethereum:${address}`
@@ -850,6 +854,11 @@ async function updateCryptoPayment(order, payment) {
   order.cryptoPaidAt = order.updatedAt
   await notifyCustomerOrderUpdate(order, 'payment_confirmed')
 
+  if (order.delivery === 'meetup') {
+    await notifyAdmins(order, 'Meetup: acconto 25% pagato')
+    return true
+  }
+
   for (const adminId of adminIds) {
     const amounts = cryptoPaymentAmounts(order)
     await sendTelegramMessage(adminId, [
@@ -984,7 +993,7 @@ app.post('/api/orders', async (req, res) => {
   const subtotal = items.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0)
   const fees = payment === 'ccpp' ? ccppFee : 0
   const total = subtotal + fees
-  const paymentDueEur = delivery === 'meetup' ? Number((total * meetupDepositRate).toFixed(2)) : total
+  const paymentDueEur = delivery === 'meetup' ? meetupDepositForTotal(total) : total
   const paymentDescription = delivery === 'meetup' ? 'Acconto Meetup 25%' : 'Pagamento ordine'
   const cryptoCurrency = String(req.body.cryptoCurrency || 'BTC')
   const cryptoPayment = payment === 'crypto' ? cryptoWallets[cryptoCurrency] || cryptoWallets.BTC : null
@@ -1044,9 +1053,7 @@ app.post('/api/orders', async (req, res) => {
   orders.unshift(order)
   await writeJson(ordersFile, orders)
   await notifyCustomerOrderUpdate(order, 'created')
-  if (delivery === 'meetup') {
-    await notifyAdmins(order, 'Nuova richiesta Meetup')
-  } else if (payment === 'ccpp') {
+  if (payment === 'ccpp') {
     await notifyAdmins(order, 'Nuovo ordine CCPP')
   }
   res.status(201).json(order)

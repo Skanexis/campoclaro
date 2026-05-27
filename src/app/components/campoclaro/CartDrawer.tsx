@@ -227,7 +227,7 @@ export function CartDrawer() {
   const itemKey = (item: { id: string; weight: string; strain?: string }) => `${item.id}-${item.weight}-${item.strain || 'default'}`
   const ccppFee = delivery === 'ship' && payMethod === 'ccpp' ? CCPP_FEE : 0
   const orderTotal = total + ccppFee
-  const meetupDeposit = Number((total * 0.25).toFixed(2))
+  const meetupDeposit = Math.max(0, Math.floor(total * 0.25))
   const requiresCryptoPayment = delivery === 'meetup' || payMethod === 'crypto'
   const selectedCrypto = {
     ...CRYPTO_WALLETS[cryptoCurrency],
