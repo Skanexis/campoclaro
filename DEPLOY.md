@@ -168,6 +168,10 @@ Expected:
 {"ok":true}
 ```
 
+Persistent orders, catalog edits, and site content are stored outside the Git
+checkout in `/opt/campoclaro-data`. Files in `server/data` are initial seed
+files only and are copied on the first start of an empty data directory.
+
 Register the bot webhook after HTTPS is configured in step 8:
 
 ```bash
@@ -257,6 +261,32 @@ Do not open `3101` publicly. Docker binds it only to `127.0.0.1`.
 
 ## 10. Updating The Site Later
 
+### One-time migration from older deployments
+
+Older versions mounted the writable database directory inside the Git checkout
+at `/opt/campoclaro/server/data`. This causes `git pull` to fail when a catalog
+file was changed by the admin panel. Run this once on an existing VPS before
+the first update to the new layout:
+
+```bash
+cd /opt/campoclaro
+docker compose stop app
+mkdir -p /opt/campoclaro-data
+cp -a server/data/. /opt/campoclaro-data/
+git restore server/data server-api.err.log server-api.out.log vite-dev.err.log vite-dev.out.log
+git pull
+docker compose up -d --build
+docker compose logs -f app
+```
+
+The `cp` step preserves the live orders and admin catalog edits before Git
+restores the tracked seed files. After this migration, application writes go
+to `/opt/campoclaro-data` and no longer block `git pull`.
+
+After migration, change the live catalog from the admin panel. Updates to
+`server/data/products.json` are seeds for a new empty installation and do not
+overwrite the persistent catalog on an existing server.
+
 On your computer:
 
 ```bash
@@ -279,20 +309,20 @@ docker compose logs -f app
 Orders and products are stored in:
 
 ```text
-/opt/campoclaro/server/data
+/opt/campoclaro-data
 ```
 
 Create a quick backup:
 
 ```bash
-cd /opt/campoclaro
-tar -czf campoclaro-data-$(date +%F).tar.gz server/data
+cd /opt
+tar -czf campoclaro-data-$(date +%F).tar.gz campoclaro-data
 ```
 
 Download it from another terminal:
 
 ```bash
-scp root@YOUR_VPS_IP:/opt/campoclaro/campoclaro-data-YYYY-MM-DD.tar.gz .
+scp root@YOUR_VPS_IP:/opt/campoclaro-data-YYYY-MM-DD.tar.gz .
 ```
 
 ## 12. Useful Commands

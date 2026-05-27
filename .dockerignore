@@ -6,3 +6,4 @@ dist
 server-api*.log
 vite-dev*.log
 npm-debug.log*
+server/runtime-data

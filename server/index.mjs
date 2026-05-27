@@ -3,6 +3,7 @@ import cors from 'cors'
 import crypto from 'crypto'
 import dotenv from 'dotenv'
 import express from 'express'
+import { constants as fsConstants } from 'fs'
 import fs from 'fs/promises'
 import { nanoid } from 'nanoid'
 import path from 'path'
@@ -12,7 +13,8 @@ dotenv.config()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const publicDir = path.join(__dirname, '..', 'dist')
-const dataDir = path.join(__dirname, 'data')
+const seedDataDir = path.join(__dirname, 'data')
+const dataDir = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'runtime-data'))
 const productsFile = path.join(dataDir, 'products.json')
 const ordersFile = path.join(dataDir, 'orders.json')
 const siteContentFile = path.join(dataDir, 'site-content.json')
@@ -350,6 +352,18 @@ async function readJson(file, fallback) {
 async function writeJson(file, data) {
   await fs.mkdir(path.dirname(file), { recursive: true })
   await fs.writeFile(file, `${JSON.stringify(data, null, 2)}\n`)
+}
+
+async function initializeDataDir() {
+  await fs.mkdir(dataDir, { recursive: true })
+  for (const fileName of ['products.json', 'orders.json', 'site-content.json']) {
+    const target = path.join(dataDir, fileName)
+    try {
+      await fs.copyFile(path.join(seedDataDir, fileName), target, fsConstants.COPYFILE_EXCL)
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error
+    }
+  }
 }
 
 function signSession(payload) {
@@ -1179,14 +1193,23 @@ app.get(/^\/(?!api\/).*/, (_req, res) => {
   res.sendFile(path.join(publicDir, 'index.html'))
 })
 
-app.listen(port, () => {
-  console.log(`API listening on http://localhost:${port}`)
-  autoCompleteDeliveredOrders().catch(error => console.error('Auto delivery check failed:', error.message))
-  checkPendingCryptoPayments().catch(error => console.error('Crypto payment check failed:', error.message))
-  setInterval(() => {
+async function startServer() {
+  await initializeDataDir()
+  app.listen(port, () => {
+    console.log(`API listening on http://localhost:${port}`)
+    console.log(`Runtime data directory: ${dataDir}`)
     autoCompleteDeliveredOrders().catch(error => console.error('Auto delivery check failed:', error.message))
-  }, autoDeliverCheckMs).unref()
-  setInterval(() => {
     checkPendingCryptoPayments().catch(error => console.error('Crypto payment check failed:', error.message))
-  }, cryptoPaymentCheckMs).unref()
+    setInterval(() => {
+      autoCompleteDeliveredOrders().catch(error => console.error('Auto delivery check failed:', error.message))
+    }, autoDeliverCheckMs).unref()
+    setInterval(() => {
+      checkPendingCryptoPayments().catch(error => console.error('Crypto payment check failed:', error.message))
+    }, cryptoPaymentCheckMs).unref()
+  })
+}
+
+startServer().catch(error => {
+  console.error('Server startup failed:', error)
+  process.exitCode = 1
 })
