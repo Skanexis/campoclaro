@@ -297,21 +297,47 @@ function PriceEditor({
   prices,
   onChange,
   showLabel = true,
+  resetKey,
 }: {
   prices: Record<string, number>
   onChange: (prices: Record<string, number>) => void
   showLabel?: boolean
+  resetKey: string
 }) {
-  const rows = Object.entries(prices)
-  const setRows = (nextRows: Array<[string, number]>) => {
-    onChange(Object.fromEntries(nextRows))
+  const nextId = useRef(0)
+  const makeRows = (value: Record<string, number>) => Object.entries(value).map(([weight, price], index) => ({
+    id: `${resetKey}-${index}`,
+    weight,
+    price: Number.isFinite(price) ? String(price) : '',
+  }))
+  const [rows, setRowsState] = useState(() => makeRows(prices))
+
+  useEffect(() => {
+    setRowsState(makeRows(prices))
+  }, [resetKey])
+
+  const emit = (nextRows: typeof rows) => {
+    onChange(Object.fromEntries(
+      nextRows
+        .map(row => [row.weight.trim(), Number(row.price)] as [string, number])
+        .filter(([weight, price]) => weight && Number.isFinite(price))
+    ))
+  }
+
+  const setRows = (nextRows: typeof rows) => {
+    setRowsState(nextRows)
+    emit(nextRows)
   }
 
   const updateRow = (index: number, field: 'weight' | 'price', value: string) => {
     setRows(rows.map((row, i) => {
       if (i !== index) return row
-      return field === 'weight' ? [value, row[1]] : [row[0], value === '' ? Number.NaN : Number(value)]
+      return field === 'weight' ? { ...row, weight: value } : { ...row, price: value }
     }))
+  }
+
+  const addRow = (weight = '') => {
+    setRows([...rows, { id: `price-draft-${nextId.current++}`, weight, price: '' }])
   }
 
   return (
@@ -322,10 +348,10 @@ function PriceEditor({
           <div style={{ padding: '10px 12px', borderRadius: 6, border: '1px dashed rgba(255,255,255,0.12)', color: 'rgba(245,245,245,0.34)', fontFamily: "'Inter', sans-serif", fontSize: '0.78rem' }}>
             Aggiungi almeno un formato e un prezzo.
           </div>
-        ) : rows.map(([weight, price], index) => (
-          <div key={`price-row-${index}`} className="admin-price-row" style={{ display: 'grid', gridTemplateColumns: '1fr minmax(110px, 0.7fr) auto', gap: 8 }}>
-            <input value={weight} placeholder="100g" onChange={event => updateRow(index, 'weight', event.target.value)} style={{ minWidth: 0, padding: '10px 12px', borderRadius: 6, color: '#F5F5F5', fontFamily: "'Inter', sans-serif", fontSize: '0.86rem' }} />
-            <input type="number" min="0" step="1" value={Number.isFinite(price) ? price : ''} placeholder="500" onChange={event => updateRow(index, 'price', event.target.value)} style={{ minWidth: 0, padding: '10px 12px', borderRadius: 6, color: '#F5F5F5', fontFamily: "'Inter', sans-serif", fontSize: '0.86rem' }} />
+        ) : rows.map((row, index) => (
+          <div key={row.id} className="admin-price-row" style={{ display: 'grid', gridTemplateColumns: '1fr minmax(110px, 0.7fr) auto', gap: 8 }}>
+            <input value={row.weight} placeholder="100g" onChange={event => updateRow(index, 'weight', event.target.value)} style={{ minWidth: 0, padding: '10px 12px', borderRadius: 6, color: '#F5F5F5', fontFamily: "'Inter', sans-serif", fontSize: '0.86rem' }} />
+            <input type="number" min="0" step="1" value={row.price} placeholder="500" onChange={event => updateRow(index, 'price', event.target.value)} style={{ minWidth: 0, padding: '10px 12px', borderRadius: 6, color: '#F5F5F5', fontFamily: "'Inter', sans-serif", fontSize: '0.86rem' }} />
             <button type="button" title="Rimuovi" onClick={() => setRows(rows.filter((_, i) => i !== index))} style={{ width: 40, borderRadius: 6, border: '1px solid rgba(229,115,115,0.24)', background: 'rgba(229,115,115,0.08)', color: '#E57373', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <X size={14} />
             </button>
@@ -337,15 +363,15 @@ function PriceEditor({
               key={weight}
               type="button"
               onClick={() => {
-                if (Object.prototype.hasOwnProperty.call(prices, weight)) return
-                onChange({ ...prices, [weight]: 0 })
+                if (rows.some(row => row.weight.trim() === weight)) return
+                addRow(weight)
               }}
               style={{ padding: '8px 11px', borderRadius: 6, border: '1px solid rgba(214,178,94,0.28)', background: 'rgba(214,178,94,0.08)', color: '#D6B25E', cursor: 'pointer' }}
             >
               + {weight}
             </button>
           ))}
-          <button type="button" onClick={() => onChange({ ...prices, [Object.prototype.hasOwnProperty.call(prices, '') ? `Formato ${rows.length + 1}` : '']: 0 })} style={{ padding: '8px 11px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)', color: 'rgba(245,245,245,0.62)', cursor: 'pointer' }}>
+          <button type="button" onClick={() => addRow()} style={{ padding: '8px 11px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)', color: 'rgba(245,245,245,0.62)', cursor: 'pointer' }}>
             + Altro
           </button>
         </div>
@@ -430,6 +456,7 @@ export function AdminPage() {
   const [mediaUploading, setMediaUploading] = useState<ProductMediaKey | ''>('')
   const [removedMedia, setRemovedMedia] = useState<string[]>([])
   const [orderFilter, setOrderFilter] = useState<'all' | 'new' | 'paid' | 'shipped' | 'completed' | 'meetup'>('all')
+  const [priceEditorVersion, setPriceEditorVersion] = useState(0)
   const productFormRef = useRef<HTMLDivElement>(null)
   const productNameRef = useRef<HTMLInputElement>(null)
 
@@ -491,6 +518,7 @@ export function AdminPage() {
       setEditing(saved)
       setPricesInput(formatPrices(saved.prices))
       setRemovedMedia([])
+      setPriceEditorVersion(version => version + 1)
       await loadAdmin()
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Salvataggio non riuscito')
@@ -559,6 +587,7 @@ export function AdminPage() {
     setEditing({ ...EMPTY_PRODUCT })
     setPricesInput('')
     setRemovedMedia([])
+    setPriceEditorVersion(version => version + 1)
     await loadAdmin()
   }
 
@@ -566,6 +595,7 @@ export function AdminPage() {
     setEditing({ ...EMPTY_PRODUCT, prices: {}, strains: [], tags: [] })
     setPricesInput('')
     setRemovedMedia([])
+    setPriceEditorVersion(version => version + 1)
     window.setTimeout(() => {
       productFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       productNameRef.current?.focus()
@@ -576,6 +606,7 @@ export function AdminPage() {
     setEditing({ ...product, originalId: product.id })
     setPricesInput(formatPrices(product.prices))
     setRemovedMedia([])
+    setPriceEditorVersion(version => version + 1)
     window.setTimeout(() => {
       productFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 0)
@@ -962,7 +993,7 @@ export function AdminPage() {
                 </AdminFormBlock>
 
                 <AdminFormBlock title="Prezzi" className="admin-price-editor">
-                  <PriceEditor prices={editing.prices || {}} showLabel={false} onChange={prices => {
+                  <PriceEditor prices={editing.prices || {}} showLabel={false} resetKey={`${editing.originalId || editing.id || 'draft'}-${priceEditorVersion}`} onChange={prices => {
                     setEditing(p => ({ ...p, prices }))
                     setPricesInput(formatPrices(prices))
                   }} />
