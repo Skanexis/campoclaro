@@ -21,6 +21,7 @@ export function ProductPage() {
     if (product) {
       setSelectedWeight(Object.keys(product.prices)[0])
       setSelectedStrain(product.strains?.[0] || '')
+      setActiveVisual(0)
     }
   }, [product])
 
@@ -46,11 +47,17 @@ export function ProductPage() {
   const currentPrice = product.prices[selectedWeight] || 0
   const totalPrice = currentPrice * quantity
 
-  const VISUALS = [
+  const placeholderVisuals = [
     { label: 'Vista Frontale', angle: 'primary' },
     { label: 'Dettaglio', angle: 'detail' },
     { label: 'Profilo', angle: 'side' },
   ]
+  const gallery = [
+    ...(product.images || []).map((url, index) => ({ type: 'image' as const, url, label: `Foto ${index + 1}` })),
+    ...(product.videos || []).map((url, index) => ({ type: 'video' as const, url, label: `Video ${index + 1}` })),
+  ]
+  const visualCount = gallery.length || placeholderVisuals.length
+  const activeMedia = gallery[activeVisual]
 
   const handleAdd = () => {
     addItem({ id: product.id, name: product.name, weight: selectedWeight, strain: selectedStrain || undefined, price: currentPrice, quantity })
@@ -97,7 +104,7 @@ export function ProductPage() {
             transition={{ duration: 0.6 }}
           >
             {/* Main Visual */}
-            <div className="product-main-visual cc-product-orbit cc-animated-surface" style={{
+            <div className={`product-main-visual cc-animated-surface ${gallery.length === 0 ? 'cc-product-orbit' : ''}`} style={{
               borderRadius: 8,
               overflow: 'hidden',
               background: product.gradient,
@@ -126,52 +133,62 @@ export function ProductPage() {
                     gap: 8,
                   }}
                 >
-                  <motion.div
-                    animate={{ scale: [1, 1.05, 1], rotate: [0, 3, 0] }}
-                    transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-                    style={{
-                      width: 72,
-                      height: 72,
-                      borderRadius: '50%',
-                      background: `radial-gradient(circle, ${product.glowColor.replace(/[\d.]+\)$/, '0.7)')}, transparent 70%)`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <div style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: '50%',
-                      border: '1px solid rgba(214,178,94,0.25)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: 'rgba(5,5,5,0.3)',
-                    }}>
-                      <div style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: '50%',
-                        background: `radial-gradient(circle, rgba(214,178,94,0.4), rgba(240,201,106,0.15))`,
-                      }} />
-                    </div>
-                  </motion.div>
-                  <span style={{
-                    fontFamily: "'Inter', sans-serif",
-                    fontSize: '0.55rem',
-                    letterSpacing: '0.15em',
-                    textTransform: 'uppercase',
-                    color: 'rgba(245,245,245,0.3)',
-                  }}>
-                    {VISUALS[activeVisual].label}
-                  </span>
+                  {activeMedia ? (
+                    activeMedia.type === 'image' ? (
+                      <img src={activeMedia.url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <video src={activeMedia.url} controls playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#050505' }} />
+                    )
+                  ) : (
+                    <>
+                      <motion.div
+                        animate={{ scale: [1, 1.05, 1], rotate: [0, 3, 0] }}
+                        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+                        style={{
+                          width: 72,
+                          height: 72,
+                          borderRadius: '50%',
+                          background: `radial-gradient(circle, ${product.glowColor.replace(/[\d.]+\)$/, '0.7)')}, transparent 70%)`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <div style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: '50%',
+                          border: '1px solid rgba(214,178,94,0.25)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'rgba(5,5,5,0.3)',
+                        }}>
+                          <div style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: '50%',
+                            background: 'radial-gradient(circle, rgba(214,178,94,0.4), rgba(240,201,106,0.15))',
+                          }} />
+                        </div>
+                      </motion.div>
+                      <span style={{
+                        fontFamily: "'Inter', sans-serif",
+                        fontSize: '0.55rem',
+                        letterSpacing: '0.15em',
+                        textTransform: 'uppercase',
+                        color: 'rgba(245,245,245,0.3)',
+                      }}>
+                        {placeholderVisuals[activeVisual].label}
+                      </span>
+                    </>
+                  )}
                 </motion.div>
               </AnimatePresence>
 
               {/* Gallery Nav */}
-              <button
-                onClick={() => setActiveVisual(v => (v - 1 + VISUALS.length) % VISUALS.length)}
+              {visualCount > 1 && <button
+                onClick={() => setActiveVisual(v => (v - 1 + visualCount) % visualCount)}
                 style={{
                   position: 'absolute',
                   left: 12,
@@ -190,9 +207,9 @@ export function ProductPage() {
                 }}
               >
                 <ChevronLeft size={16} />
-              </button>
-              <button
-                onClick={() => setActiveVisual(v => (v + 1) % VISUALS.length)}
+              </button>}
+              {visualCount > 1 && <button
+                onClick={() => setActiveVisual(v => (v + 1) % visualCount)}
                 style={{
                   position: 'absolute',
                   right: 12,
@@ -211,14 +228,14 @@ export function ProductPage() {
                 }}
               >
                 <ChevronRight size={16} />
-              </button>
+              </button>}
             </div>
 
             {/* Thumbnails */}
             <div className="product-thumbs" style={{ display: 'flex', gap: 8 }}>
-              {VISUALS.map((v, i) => (
+              {(gallery.length ? gallery : placeholderVisuals).map((visual, i) => (
                 <motion.button
-                  key={i}
+                  key={'url' in visual ? visual.url : visual.label}
                   whileHover={{ scale: 1.04 }}
                   whileTap={{ scale: 0.96 }}
                   onClick={() => setActiveVisual(i)}
@@ -236,13 +253,21 @@ export function ProductPage() {
                     justifyContent: 'center',
                   }}
                 >
-                  <div style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: '50%',
-                    background: activeVisual === i ? 'rgba(214,178,94,0.4)' : 'rgba(214,178,94,0.15)',
-                    transition: 'background 0.2s',
-                  }} />
+                  {'url' in visual ? (
+                    visual.type === 'image' ? (
+                      <img src={visual.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <video src={visual.url} muted playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    )
+                  ) : (
+                    <div style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: '50%',
+                      background: activeVisual === i ? 'rgba(214,178,94,0.4)' : 'rgba(214,178,94,0.15)',
+                      transition: 'background 0.2s',
+                    }} />
+                  )}
                 </motion.button>
               ))}
             </div>

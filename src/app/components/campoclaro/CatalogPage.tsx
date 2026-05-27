@@ -48,6 +48,9 @@ function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart()
 
   const currentPrice = product.prices[selectedWeight]
+  const coverImage = product.images?.[0]
+  const coverVideo = !coverImage ? product.videos?.[0] : undefined
+  const hasMedia = Boolean(coverImage || coverVideo)
 
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -74,7 +77,7 @@ function ProductCard({ product }: { product: Product }) {
     >
       <Link to={`/prodotto/${product.id}`} style={{ textDecoration: 'none', display: 'block' }}>
         {/* Visual Area */}
-        <div className="catalog-card-visual cc-product-orbit" style={{
+        <div className={`catalog-card-visual ${hasMedia ? '' : 'cc-product-orbit'}`} style={{
           height: hovered ? 116 : 146,
           background: product.gradient,
           display: 'flex',
@@ -83,29 +86,36 @@ function ProductCard({ product }: { product: Product }) {
           position: 'relative',
           overflow: 'hidden',
         }}>
-          {/* Ambient glow */}
-          <motion.div
-            animate={{ scale: hovered ? 1.08 : 1, opacity: hovered ? 0.78 : 0.5 }}
-            transition={{ duration: 0.4 }}
-            style={{
-            width: hovered ? 72 : 88,
-            height: hovered ? 72 : 88,
-              borderRadius: '50%',
-              background: `radial-gradient(circle, ${product.glowColor.replace(/[\d.]+\)$/, '0.5)')}, transparent 70%)`,
-            }}
-          />
-          <div style={{
-            position: 'absolute',
-            width: hovered ? 38 : 46,
-            height: hovered ? 38 : 46,
-            borderRadius: '50%',
-            border: '1px solid rgba(214,178,94,0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <div style={{ width: hovered ? 18 : 22, height: hovered ? 18 : 22, borderRadius: '50%', background: 'rgba(214,178,94,0.25)' }} />
-          </div>
+          {coverImage ? (
+            <img src={coverImage} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : coverVideo ? (
+            <video src={coverVideo} muted playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <>
+              <motion.div
+                animate={{ scale: hovered ? 1.08 : 1, opacity: hovered ? 0.78 : 0.5 }}
+                transition={{ duration: 0.4 }}
+                style={{
+                  width: hovered ? 72 : 88,
+                  height: hovered ? 72 : 88,
+                  borderRadius: '50%',
+                  background: `radial-gradient(circle, ${product.glowColor.replace(/[\d.]+\)$/, '0.5)')}, transparent 70%)`,
+                }}
+              />
+              <div style={{
+                position: 'absolute',
+                width: hovered ? 38 : 46,
+                height: hovered ? 38 : 46,
+                borderRadius: '50%',
+                border: '1px solid rgba(214,178,94,0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <div style={{ width: hovered ? 18 : 22, height: hovered ? 18 : 22, borderRadius: '50%', background: 'rgba(214,178,94,0.25)' }} />
+              </div>
+            </>
+          )}
 
           {/* Badges */}
           <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>

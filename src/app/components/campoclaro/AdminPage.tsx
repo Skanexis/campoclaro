@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { motion } from 'motion/react'
-import { BarChart3, Check, ExternalLink, LogOut, Mail, Package, Save, Send, ShoppingBag, Trash2, UserCheck, X } from 'lucide-react'
+import { BarChart3, Check, ExternalLink, Film, ImageIcon, LogOut, Mail, Package, Save, Send, ShoppingBag, Trash2, Upload, UserCheck, X } from 'lucide-react'
 import { Product } from './data'
 import { api, Order, SiteContent } from '../../lib/api'
 import { FALLBACK_SITE_CONTENT } from '../../hooks/useSiteContent'
 import { TelegramStartLogin } from './TelegramStartLogin'
 
 type AdminTab = 'orders' | 'products' | 'filters' | 'contacts' | 'newsletter'
+type ProductMediaKey = 'images' | 'videos'
 
 const EMPTY_PRODUCT: Product & { active?: boolean; originalId?: string } = {
   id: '',
@@ -17,6 +18,8 @@ const EMPTY_PRODUCT: Product & { active?: boolean; originalId?: string } = {
   longDescription: '',
   prices: {},
   strains: [],
+  images: [],
+  videos: [],
   thc: '',
   cbd: '',
   tags: [],
@@ -232,6 +235,8 @@ export function AdminPage() {
   const [newsletterTitle, setNewsletterTitle] = useState('')
   const [newsletterBody, setNewsletterBody] = useState('')
   const [newsletterSending, setNewsletterSending] = useState(false)
+  const [mediaUploading, setMediaUploading] = useState<ProductMediaKey | ''>('')
+  const [removedMedia, setRemovedMedia] = useState<string[]>([])
   const [orderFilter, setOrderFilter] = useState<'all' | 'new' | 'paid' | 'shipped' | 'completed' | 'meetup'>('all')
 
   const loadAdmin = async () => {
@@ -264,6 +269,10 @@ export function AdminPage() {
 
   const saveProduct = async () => {
     setMessage('')
+    if (mediaUploading) {
+      setMessage('Attendi la fine del caricamento media.')
+      return
+    }
     if (Object.keys(editing.prices).length === 0) {
       setMessage('Inserisci i prezzi, ad esempio: 100g: 500, 500g: 2400')
       return
@@ -271,9 +280,11 @@ export function AdminPage() {
     try {
       await api.saveSiteContent(siteContent)
       const saved = await api.saveProduct(editing)
+      await Promise.all(removedMedia.map(url => api.deleteProductMedia(url).catch(() => undefined)))
       setMessage('Prodotto salvato')
       setEditing(saved)
       setPricesInput(formatPrices(saved.prices))
+      setRemovedMedia([])
       await loadAdmin()
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Salvataggio non riuscito')
@@ -337,20 +348,53 @@ export function AdminPage() {
   }
 
   const deleteProduct = async (id: string) => {
+    await Promise.all([...(editing.images || []), ...(editing.videos || [])].map(url => api.deleteProductMedia(url).catch(() => undefined)))
     await api.deleteProduct(id)
     setEditing({ ...EMPTY_PRODUCT })
     setPricesInput('')
+    setRemovedMedia([])
     await loadAdmin()
   }
 
   const startNewProduct = () => {
     setEditing({ ...EMPTY_PRODUCT, prices: {}, strains: [], tags: [] })
     setPricesInput('')
+    setRemovedMedia([])
   }
 
   const selectProduct = (product: Product & { active?: boolean }) => {
     setEditing({ ...product, originalId: product.id })
     setPricesInput(formatPrices(product.prices))
+    setRemovedMedia([])
+  }
+
+  const uploadProductMedia = async (files: FileList | null, key: ProductMediaKey) => {
+    if (!files?.length) return
+    const limit = key === 'images' ? 5 : 8
+    const available = limit - (editing[key]?.length || 0)
+    if (available <= 0) {
+      setMessage(`Limite raggiunto: massimo ${limit} ${key === 'images' ? 'foto' : 'video'}.`)
+      return
+    }
+    setMessage('')
+    setMediaUploading(key)
+    try {
+      for (const file of Array.from(files).slice(0, available)) {
+        const result = key === 'images' ? await api.uploadProductImage(file) : await api.uploadProductVideo(file)
+        setEditing(prev => ({ ...prev, [key]: [...(prev[key] || []), result.url].slice(0, limit) }))
+      }
+      setMessage('Media caricati. Premi Salva per collegarli al prodotto.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Caricamento media non riuscito')
+    } finally {
+      setMediaUploading('')
+    }
+  }
+
+  const removeProductMedia = (key: ProductMediaKey, url: string) => {
+    setEditing(prev => ({ ...prev, [key]: (prev[key] || []).filter(item => item !== url) }))
+    setRemovedMedia(prev => prev.includes(url) ? prev : [...prev, url])
+    setMessage('Media rimosso. Premi Salva per aggiornare il prodotto.')
   }
 
   const updateOrderStatus = async (id: string, status: string) => {
@@ -702,6 +746,50 @@ export function AdminPage() {
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}><Field label="Descrizione breve" value={editing.description} onChange={v => setEditing(p => ({ ...p, description: v }))} /></div>
                 <div style={{ gridColumn: '1 / -1' }}><Field label="Descrizione lunga" value={editing.longDescription} onChange={v => setEditing(p => ({ ...p, longDescription: v }))} textarea /></div>
+                {([
+                  { key: 'images' as ProductMediaKey, label: 'Foto', limit: 5, accept: 'image/*', icon: <ImageIcon size={15} /> },
+                  { key: 'videos' as ProductMediaKey, label: 'Video', limit: 8, accept: 'video/*', icon: <Film size={15} /> },
+                ]).map(media => (
+                  <div key={media.key} className="admin-media-block" style={{ gridColumn: '1 / -1', padding: 12, border: '1px solid rgba(255,255,255,0.07)', borderRadius: 7, background: 'rgba(255,255,255,0.018)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.58)' }}>
+                        {media.icon} {media.label} ({editing[media.key]?.length || 0}/{media.limit})
+                      </div>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 11px', borderRadius: 6, border: '1px solid rgba(214,178,94,0.28)', color: '#D6B25E', cursor: mediaUploading ? 'wait' : 'pointer', fontFamily: "'Inter', sans-serif", fontSize: '0.72rem' }}>
+                        <Upload size={13} /> {mediaUploading === media.key ? 'Caricamento...' : 'Carica'}
+                        <input
+                          type="file"
+                          multiple
+                          accept={media.accept}
+                          disabled={Boolean(mediaUploading) || (editing[media.key]?.length || 0) >= media.limit}
+                          onChange={event => {
+                            void uploadProductMedia(event.target.files, media.key)
+                            event.currentTarget.value = ''
+                          }}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    </div>
+                    {(editing[media.key]?.length || 0) === 0 ? (
+                      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.74rem', color: 'rgba(245,245,245,0.3)' }}>Nessun file caricato.</div>
+                    ) : (
+                      <div className="admin-media-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(108px, 1fr))', gap: 8 }}>
+                        {(editing[media.key] || []).map(url => (
+                          <div key={url} style={{ position: 'relative', height: 88, overflow: 'hidden', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: '#08080a' }}>
+                            {media.key === 'images' ? (
+                              <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <video src={url} muted playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            )}
+                            <button type="button" title="Rimuovi" onClick={() => removeProductMedia(media.key, url)} style={{ position: 'absolute', top: 5, right: 5, width: 24, height: 24, borderRadius: 12, border: '1px solid rgba(229,115,115,0.35)', background: 'rgba(5,5,5,0.8)', color: '#E57373', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
                 <div style={{ gridColumn: '1 / -1', ...panel, padding: 14, background: editing.gradient }}>
                   <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, color: '#F5F5F5', marginBottom: 8 }}>{editing.name || 'Preview prodotto'}</div>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -713,8 +801,8 @@ export function AdminPage() {
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 18 }}>
-                <button onClick={saveProduct} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: 'linear-gradient(135deg, #D6B25E, #F0C96A)', color: '#050505', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>
-                  <Save size={16} /> Salva
+                <button disabled={Boolean(mediaUploading)} onClick={saveProduct} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: 'linear-gradient(135deg, #D6B25E, #F0C96A)', color: '#050505', border: 'none', borderRadius: 6, fontWeight: 700, cursor: mediaUploading ? 'wait' : 'pointer', opacity: mediaUploading ? 0.65 : 1 }}>
+                  <Save size={16} /> {mediaUploading ? 'Caricamento...' : 'Salva'}
                 </button>
                 {editing.id && (
                   <button onClick={() => deleteProduct(editing.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: 'rgba(229,115,115,0.08)', color: '#E57373', border: '1px solid rgba(229,115,115,0.25)', borderRadius: 6, cursor: 'pointer' }}>

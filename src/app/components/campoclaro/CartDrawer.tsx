@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { motion, AnimatePresence } from 'motion/react'
-import { X, Plus, Minus, Trash2, Truck, MapPin, ChevronRight, Check, ArrowLeft, Copy } from 'lucide-react'
+import { X, Plus, Minus, Trash2, Truck, MapPin, ChevronRight, Check, ArrowLeft } from 'lucide-react'
 import { useCart } from '../../context/CartContext'
-import { api } from '../../lib/api'
+import { api, type Order } from '../../lib/api'
 import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
 import { TelegramStartLogin } from './TelegramStartLogin'
+import { CryptoPaymentModal } from './CryptoPaymentModal'
 
 type DeliveryMethod = 'ship' | 'meetup'
 type PaymentMethod = 'crypto' | 'ccpp'
@@ -215,9 +216,8 @@ export function CartDrawer() {
   const [orderError, setOrderError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [telegramCustomer, setTelegramCustomer] = useState<TelegramCustomer | null>(null)
-  const [lastOrder, setLastOrder] = useState<{ id: string; trackingNumber?: string; trackingProvider?: string; trackingUrl?: string; paymentStatus?: string; cryptoExpectedAmount?: string; cryptoExpectedUnit?: string; cryptoWallet?: string; cryptoPaymentUri?: string; cryptoTxHash?: string } | null>(null)
-  const [txHash, setTxHash] = useState('')
-  const [paymentReported, setPaymentReported] = useState(false)
+  const [lastOrder, setLastOrder] = useState<Order | null>(null)
+  const [cryptoModalOpen, setCryptoModalOpen] = useState(false)
   const [walletAvailability, setWalletAvailability] = useState<Record<string, { busy: boolean; address: string; network: string; label: string }>>({})
 
   const [address, setAddress] = useState({ via: '', city: '', cap: '', notes: '' })
@@ -254,7 +254,7 @@ export function CartDrawer() {
     const interval = window.setInterval(async () => {
       try {
         const order = await api.publicOrder(lastOrder.id)
-        setLastOrder(order)
+        setLastOrder(previous => previous ? { ...previous, ...order } : previous)
       } catch {}
     }, 5000)
     return () => window.clearInterval(interval)
@@ -285,16 +285,6 @@ export function CartDrawer() {
     }
     setStep('confirm')
   }
-  const copyCryptoAddress = () => {
-    navigator.clipboard?.writeText(lastOrder?.cryptoWallet || selectedCrypto.address).catch(() => {})
-  }
-  const copyCryptoAmount = () => {
-    navigator.clipboard?.writeText(lastOrder?.cryptoExpectedAmount || '').catch(() => {})
-  }
-  const copyCryptoUri = () => {
-    navigator.clipboard?.writeText(lastOrder?.cryptoPaymentUri || '').catch(() => {})
-  }
-
   const handlePlaceOrder = async () => {
     setSubmitting(true)
     setOrderError('')
@@ -310,24 +300,10 @@ export function CartDrawer() {
       })
       setLastOrder(order)
       setStep('success')
+      if (order.payment === 'crypto') setCryptoModalOpen(true)
       clearCart()
     } catch (error) {
       setOrderError(error instanceof Error ? error.message : 'Errore durante invio ordine')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleReportPayment = async () => {
-    if (!lastOrder?.id) return
-    setSubmitting(true)
-    setOrderError('')
-    try {
-      const order = await api.reportCryptoPaid(lastOrder.id, txHash)
-      setLastOrder(order)
-      setPaymentReported(true)
-    } catch (error) {
-      setOrderError(error instanceof Error ? error.message : 'Errore durante conferma pagamento')
     } finally {
       setSubmitting(false)
     }
@@ -339,6 +315,7 @@ export function CartDrawer() {
   }
 
   return (
+    <>
     <AnimatePresence>
       {isOpen && (
         <>
@@ -932,75 +909,14 @@ export function CartDrawer() {
                         ? `Invia esattamente ${lastOrder?.cryptoExpectedAmount || ''} ${lastOrder?.cryptoExpectedUnit || selectedCrypto.label}. Il sistema verifica automaticamente la blockchain.`
                         : 'Il tuo ordine è stato registrato. Riceverai conferma a breve.'}
                     </div>
-                    {delivery === 'ship' && payMethod === 'crypto' && (
-                      <div style={{ width: 'min(360px, 100%)', margin: '18px auto 0', display: 'grid', gap: 8 }}>
-                        {[
-                          { label: 'Importo', value: `${lastOrder?.cryptoExpectedAmount || ''} ${lastOrder?.cryptoExpectedUnit || selectedCrypto.label}`, onClick: copyCryptoAmount },
-                          { label: 'Wallet', value: lastOrder?.cryptoWallet || selectedCrypto.address, onClick: copyCryptoAddress },
-                          ...(lastOrder?.cryptoPaymentUri ? [{ label: 'Payment URI', value: lastOrder.cryptoPaymentUri, onClick: copyCryptoUri }] : []),
-                        ].map(item => (
-                          <button
-                            className="cc-cart-payment-copy"
-                            key={item.label}
-                            type="button"
-                            onClick={item.onClick}
-                            style={{
-                              width: '100%',
-                              display: 'grid',
-                              gridTemplateColumns: '70px 1fr auto',
-                              alignItems: 'center',
-                              gap: 10,
-                              padding: '10px 12px',
-                              background: 'rgba(255,255,255,0.03)',
-                              border: '1px solid rgba(214,178,94,0.22)',
-                              borderRadius: 6,
-                              color: '#F5F5F5',
-                              cursor: 'pointer',
-                              fontFamily: "'JetBrains Mono', monospace",
-                              fontSize: '0.7rem',
-                              wordBreak: 'break-all',
-                              textAlign: 'left',
-                            }}
-                          >
-                            <span style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.36)', fontSize: '0.68rem' }}>{item.label}</span>
-                            <span>{item.value}</span>
-                            <Copy size={14} style={{ flexShrink: 0, color: '#D6B25E' }} />
-                          </button>
-                        ))}
-                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: lastOrder?.paymentStatus === 'paid_confirmed' ? '#6ECF95' : 'rgba(245,245,245,0.38)', lineHeight: 1.45 }}>
-                          {lastOrder?.paymentStatus === 'paid_confirmed'
-                            ? `Pagamento rilevato automaticamente${lastOrder.cryptoTxHash ? ` · TX ${lastOrder.cryptoTxHash.slice(0, 12)}...` : ''}`
-                            : 'Controllo automatico attivo. Non serve inviare screenshot.'}
-                        </div>
-                      </div>
-                    )}
-                    {delivery === 'ship' && payMethod === 'crypto' && !paymentReported && (
-                      <div style={{ width: 'min(340px, 100%)', margin: '16px auto 0', textAlign: 'left' }}>
-                        <FloatingInput label="TX hash (opzionale)" value={txHash} onChange={setTxHash} />
-                        <button
-                          type="button"
-                          disabled={submitting}
-                          onClick={handleReportPayment}
-                          style={{
-                            width: '100%',
-                            padding: '12px',
-                            background: 'linear-gradient(135deg, #D6B25E, #F0C96A)',
-                            color: '#050505',
-                            border: 'none',
-                            borderRadius: 6,
-                            fontFamily: "'Inter', sans-serif",
-                            fontWeight: 700,
-                            cursor: submitting ? 'wait' : 'pointer',
-                          }}
-                        >
-                          {submitting ? 'Invio...' : 'Ho inviato il pagamento'}
-                        </button>
-                      </div>
-                    )}
-                    {paymentReported && (
-                      <div style={{ marginTop: 16, fontFamily: "'Inter', sans-serif", fontSize: '0.78rem', color: '#D6B25E' }}>
-                        Pagamento segnalato. Gli admin hanno ricevuto la notifica Telegram.
-                      </div>
+                    {lastOrder?.payment === 'crypto' && (
+                      <button
+                        type="button"
+                        onClick={() => setCryptoModalOpen(true)}
+                        style={{ marginTop: 18, padding: '13px 20px', borderRadius: 7, border: '1px solid rgba(214,178,94,0.35)', background: 'rgba(214,178,94,0.1)', color: '#D6B25E', cursor: 'pointer', fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
+                      >
+                        Apri pagamento crypto
+                      </button>
                     )}
                     {lastOrder?.trackingNumber && (
                       <div style={{ width: 'min(340px, 100%)', margin: '18px auto 0', padding: 14, background: 'rgba(214,178,94,0.06)', border: '1px solid rgba(214,178,94,0.22)', borderRadius: 8, textAlign: 'left' }}>
@@ -1073,5 +989,12 @@ export function CartDrawer() {
         </>
       )}
     </AnimatePresence>
+    <CryptoPaymentModal
+      order={lastOrder}
+      open={cryptoModalOpen && lastOrder?.payment === 'crypto'}
+      onClose={() => setCryptoModalOpen(false)}
+      onUpdate={updated => setLastOrder(previous => previous ? { ...previous, ...updated } : previous)}
+    />
+    </>
   )
 }

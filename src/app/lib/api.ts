@@ -24,6 +24,11 @@ export interface Order {
   cryptoExpectedUnit?: string
   cryptoPaymentUri?: string
   cryptoTxHash?: string
+  cryptoRateEur?: number
+  cryptoPaidAmount?: string
+  cryptoPaidEur?: number
+  cryptoRemainingAmount?: string
+  cryptoRemainingEur?: number
   customer?: {
     id?: string
     firstName?: string
@@ -43,6 +48,8 @@ export interface Order {
   fees?: number
   total: number
 }
+
+export type CryptoPaymentOrder = Pick<Order, 'id' | 'createdAt' | 'status' | 'payment' | 'total'> & Partial<Order>
 
 export interface SiteContent {
   welcomeTitle: string
@@ -86,12 +93,23 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   return res.json()
 }
 
+async function uploadMedia(url: string, file: File): Promise<{ url: string }> {
+  const body = new FormData()
+  body.append('file', file)
+  const res = await fetch(url, { method: 'POST', body, credentials: 'include' })
+  if (!res.ok) {
+    const response = await res.json().catch(() => ({}))
+    throw new Error(response.error || `Upload failed: ${res.status}`)
+  }
+  return res.json()
+}
+
 export const api = {
   getProducts: () => request<Product[]>('/api/products'),
   getSiteContent: () => request<SiteContent>('/api/site-content'),
   cryptoWallets: () => request<CryptoWalletAvailability[]>('/api/crypto-wallets'),
   createOrder: (payload: unknown) => request<Order>('/api/orders', { method: 'POST', body: JSON.stringify(payload) }),
-  publicOrder: (id: string) => request<Pick<Order, 'id' | 'status' | 'paymentStatus' | 'trackingNumber' | 'trackingProvider' | 'trackingUrl' | 'cryptoExpectedAmount' | 'cryptoExpectedUnit' | 'cryptoWallet' | 'cryptoPaymentUri' | 'cryptoTxHash'>>(`/api/orders/${id}/public`),
+  publicOrder: (id: string) => request<CryptoPaymentOrder>(`/api/orders/${id}/public`),
   reportCryptoPaid: (id: string, txHash = '') =>
     request<Order>(`/api/orders/${id}/crypto-paid`, { method: 'POST', body: JSON.stringify({ txHash }) }),
   me: () => request<{ user: null | { id: string; username?: string; firstName?: string; role?: string } }>('/api/auth/me'),
@@ -117,6 +135,9 @@ export const api = {
       ? request<Product>(`/api/admin/products/${product.originalId || product.id}`, { method: 'PUT', body: JSON.stringify(product) })
       : request<Product>('/api/admin/products', { method: 'POST', body: JSON.stringify(product) }),
   deleteProduct: (id: string) => request(`/api/admin/products/${id}`, { method: 'DELETE' }),
+  uploadProductImage: (file: File) => uploadMedia('/api/admin/media/images', file),
+  uploadProductVideo: (file: File) => uploadMedia('/api/admin/media/videos', file),
+  deleteProductMedia: (url: string) => request('/api/admin/media', { method: 'DELETE', body: JSON.stringify({ url }) }),
   adminOrders: () => request<Order[]>('/api/admin/orders'),
   updateOrderStatus: (id: string, status: string) =>
     request<Order>(`/api/admin/orders/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),

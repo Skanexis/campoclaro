@@ -5,6 +5,7 @@ import dotenv from 'dotenv'
 import express from 'express'
 import { constants as fsConstants } from 'fs'
 import fs from 'fs/promises'
+import multer from 'multer'
 import { nanoid } from 'nanoid'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -19,6 +20,7 @@ const productsFile = path.join(dataDir, 'products.json')
 const ordersFile = path.join(dataDir, 'orders.json')
 const siteContentFile = path.join(dataDir, 'site-content.json')
 const newsletterSubscribersFile = path.join(dataDir, 'newsletter-subscribers.json')
+const mediaDir = path.join(dataDir, 'media')
 
 const defaultSiteContent = {
   welcomeTitle: 'BENVENUTI SU CAMPOCLARO',
@@ -158,6 +160,12 @@ function cryptoPaymentUri(currency, address, amount) {
   return address
 }
 
+function cryptoAmountForOrder(amount, order) {
+  const currency = order.cryptoCurrency === 'USDT' ? 'USDT_TRX' : order.cryptoCurrency
+  const decimals = (cryptoMeta[currency] || cryptoMeta.BTC).displayDecimals
+  return Math.max(0, Number(amount || 0)).toFixed(decimals)
+}
+
 async function answerTelegramCallback(callbackQueryId, text = '') {
   if (!telegramApiBase || !callbackQueryId) return
   try {
@@ -212,6 +220,7 @@ async function notifyCustomerOrderUpdate(order, event, { needsSupport = false } 
     created: isMeetup ? 'Richiesta Meetup ricevuta.' : 'Ordine ricevuto.',
     new: 'Stato ordine aggiornato.',
     payment_reported: 'Pagamento segnalato, verifica in corso.',
+    payment_partial: 'Pagamento parziale rilevato.',
     payment_confirmed: 'Pagamento confermato.',
     processing: isMeetup ? 'Meetup approvato.' : 'Ordine in lavorazione.',
     shipped: 'Spedizione aggiornata.',
@@ -228,6 +237,14 @@ async function notifyCustomerOrderUpdate(order, event, { needsSupport = false } 
     lines.push(`<b>Pagamento:</b> ${order.payment === 'crypto'
       ? `${escapeHtml(order.cryptoCurrency)} ${escapeHtml(order.cryptoPaidAmount || '')}`.trim()
       : 'CCPP confermato'}`)
+    if (order.cryptoTxHash) lines.push(`TX: <code>${escapeHtml(order.cryptoTxHash)}</code>`)
+  }
+
+  if (event === 'payment_partial') {
+    lines.push(
+      `<b>Ricevuto:</b> ${escapeHtml(order.cryptoPaidAmount || '0')} ${escapeHtml(order.cryptoCurrency || '')}`,
+      `<b>Da integrare:</b> €${escapeHtml(order.cryptoRemainingEur || 0)} · ${escapeHtml(order.cryptoRemainingAmount || '0')} ${escapeHtml(order.cryptoCurrency || '')}`,
+    )
     if (order.cryptoTxHash) lines.push(`TX: <code>${escapeHtml(order.cryptoTxHash)}</code>`)
   }
 
@@ -356,6 +373,7 @@ async function writeJson(file, data) {
 
 async function initializeDataDir() {
   await fs.mkdir(dataDir, { recursive: true })
+  await fs.mkdir(mediaDir, { recursive: true })
   for (const fileName of ['products.json', 'orders.json', 'site-content.json']) {
     const target = path.join(dataDir, fileName)
     try {
@@ -389,6 +407,29 @@ async function initializeDataDir() {
     await writeJson(productsFile, normalizedProducts)
   }
 }
+
+const mediaStorage = multer.diskStorage({
+  destination: (_req, _file, callback) => callback(null, mediaDir),
+  filename: (_req, file, callback) => {
+    const extension = path.extname(file.originalname).toLowerCase().replace(/[^a-z0-9.]/g, '').slice(0, 8)
+    callback(null, `${Date.now()}-${nanoid(10)}${extension}`)
+  },
+})
+
+const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'])
+const allowedVideoTypes = new Set(['video/mp4', 'video/webm', 'video/quicktime'])
+
+const imageUpload = multer({
+  storage: mediaStorage,
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => callback(null, allowedImageTypes.has(file.mimetype)),
+})
+
+const videoUpload = multer({
+  storage: mediaStorage,
+  limits: { fileSize: 250 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => callback(null, allowedVideoTypes.has(file.mimetype)),
+})
 
 function signSession(payload) {
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
@@ -484,6 +525,9 @@ function requireAdmin(req, res, next) {
 function normalizeProduct(input, existing = {}) {
   const prices = typeof input.prices === 'object' && input.prices ? input.prices : {}
   const filters = Array.isArray(input.filters) ? input.filters.map(String).map(v => v.trim()).filter(Boolean) : existing.filters || []
+  const mediaUrls = (value, max) => Array.isArray(value)
+    ? [...new Set(value.map(String).map(v => v.trim()).filter(Boolean))].slice(0, max)
+    : []
   const fallbackId = String(input.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || nanoid(10)
   return {
     ...existing,
@@ -495,6 +539,8 @@ function normalizeProduct(input, existing = {}) {
     prices: Object.fromEntries(Object.entries(prices).map(([k, v]) => [String(k), Number(v)]).filter(([, v]) => Number.isFinite(v))),
     filters,
     strains: Array.isArray(input.strains) ? input.strains.map(String).map(v => v.trim()).filter(Boolean) : existing.strains || [],
+    images: mediaUrls(input.images ?? existing.images, 5),
+    videos: mediaUrls(input.videos ?? existing.videos, 8),
     thc: String(input.thc || '').trim(),
     cbd: String(input.cbd || '').trim(),
     tags: Array.isArray(input.tags) ? input.tags.map(String).map(v => v.trim()).filter(Boolean).slice(0, 2) : [],
@@ -624,7 +670,7 @@ function trackingInfo(trackingNumber, requestedProvider = '') {
 function isCryptoWalletBusy(order) {
   if (order.payment !== 'crypto' || !order.cryptoWallet) return false
   if (['completed', 'cancelled'].includes(order.status)) return false
-  return ['awaiting_crypto', 'paid_reported'].includes(order.paymentStatus || 'awaiting_crypto')
+  return ['awaiting_crypto', 'paid_reported', 'partially_paid'].includes(order.paymentStatus || 'awaiting_crypto')
 }
 
 function cryptoOrderNeedsCheck(order) {
@@ -635,11 +681,9 @@ function cryptoOrderNeedsCheck(order) {
     !['completed', 'cancelled'].includes(order.status)
 }
 
-function paymentMatches(order, amount, timestampMs) {
-  const createdAt = Date.parse(order.createdAt) - 10 * 60 * 1000
-  if (Number.isFinite(timestampMs) && timestampMs < createdAt) return false
-  const expected = Number(order.cryptoExpectedAmount || 0)
-  return Number(amount) >= expected * (1 - cryptoPaymentTolerance)
+function paymentIsForOrder(order, timestampMs) {
+  const createdAt = Date.parse(order.createdAt)
+  return !Number.isFinite(timestampMs) || timestampMs >= createdAt
 }
 
 async function findBtcPayment(order) {
@@ -649,23 +693,33 @@ async function findBtcPayment(order) {
     fetchJson(`https://mempool.space/api/address/${address}/txs/mempool`),
   ])
   const txs = txLists.flatMap(result => result.status === 'fulfilled' && Array.isArray(result.value) ? result.value : [])
+  const seen = new Set()
+  let received = 0
+  let txHash = ''
   for (const tx of txs) {
+    if (!tx.txid || seen.has(tx.txid)) continue
+    seen.add(tx.txid)
     const confirmed = tx.status?.confirmed === true
     if (btcMinConfirmations > 0 && !confirmed) continue
     const timestampMs = confirmed && tx.status?.block_time ? Number(tx.status.block_time) * 1000 : Date.now()
+    if (!paymentIsForOrder(order, timestampMs)) continue
     const sats = (tx.vout || [])
       .filter(output => String(output.scriptpubkey_address || '').toLowerCase() === address.toLowerCase())
       .reduce((sum, output) => sum + Number(output.value || 0), 0)
     const amount = sats / 1e8
-    if (paymentMatches(order, amount, timestampMs)) return { txHash: tx.txid, amount, confirmations: confirmed ? btcMinConfirmations : 0 }
+    if (amount <= 0) continue
+    received += amount
+    txHash = tx.txid
   }
-  return null
+  return received > 0 ? { txHash, amount: received, confirmations: btcMinConfirmations } : null
 }
 
 async function findEthPayment(order) {
   const address = order.cryptoWallet
   const data = await fetchJson(`https://eth.blockscout.com/api/v2/addresses/${address}/transactions`)
   const txs = Array.isArray(data.items) ? data.items : []
+  let received = 0
+  let txHash = ''
   for (const tx of txs) {
     const to = tx.to?.hash || tx.to_address_hash || tx.to
     if (String(to || '').toLowerCase() !== address.toLowerCase()) continue
@@ -673,25 +727,33 @@ async function findEthPayment(order) {
     const confirmations = Number(tx.confirmations || 0)
     if (ethMinConfirmations > 0 && confirmations > 0 && confirmations < ethMinConfirmations) continue
     const timestampMs = Date.parse(tx.timestamp || tx.block_timestamp || '')
+    if (!paymentIsForOrder(order, timestampMs)) continue
     const amount = Number(tx.value || 0) / 1e18
-    if (paymentMatches(order, amount, timestampMs)) return { txHash: tx.hash || tx.transaction_hash, amount, confirmations }
+    if (amount <= 0) continue
+    received += amount
+    txHash = tx.hash || tx.transaction_hash || txHash
   }
-  return null
+  return received > 0 ? { txHash, amount: received } : null
 }
 
 async function findUsdtTrxPayment(order) {
   const address = order.cryptoWallet
   const data = await fetchJson(`https://api.trongrid.io/v1/accounts/${address}/transactions/trc20?contract_address=${usdtTronContract}&only_confirmed=true&limit=50`)
   const txs = Array.isArray(data.data) ? data.data : []
+  let received = 0
+  let txHash = ''
   for (const tx of txs) {
     const to = tx.to || tx.to_address
     if (String(to || '').toLowerCase() !== address.toLowerCase()) continue
     const decimals = Number(tx.token_info?.decimals || 6)
     const timestampMs = Number(tx.block_timestamp || tx.timestamp || 0)
+    if (!paymentIsForOrder(order, timestampMs)) continue
     const amount = Number(tx.value || 0) / (10 ** decimals)
-    if (paymentMatches(order, amount, timestampMs)) return { txHash: tx.transaction_id, amount, confirmations: tronMinConfirmations }
+    if (amount <= 0) continue
+    received += amount
+    txHash = tx.transaction_id || txHash
   }
-  return null
+  return received > 0 ? { txHash, amount: received, confirmations: tronMinConfirmations } : null
 }
 
 async function findCryptoPayment(order) {
@@ -701,14 +763,38 @@ async function findCryptoPayment(order) {
   return null
 }
 
-async function confirmCryptoPayment(order, payment) {
+async function updateCryptoPayment(order, payment) {
+  const received = Number(payment.amount || 0)
+  const previouslyReceived = Number(order.cryptoPaidAmount || 0)
+  const expected = Number(order.cryptoExpectedAmount || 0)
+  const fullyPaid = received >= expected * (1 - cryptoPaymentTolerance)
+  if (received <= previouslyReceived && (!fullyPaid || order.paymentStatus === 'paid_confirmed')) return false
+
+  const paidEur = received * Number(order.cryptoRateEur || 0)
+  order.cryptoPaidAmount = cryptoAmountForOrder(received, order)
+  order.cryptoPaidEur = Number(Math.min(Number(order.total || 0), paidEur).toFixed(2))
+  order.cryptoRemainingAmount = cryptoAmountForOrder(Math.max(0, expected - received), order)
+  order.cryptoRemainingEur = fullyPaid ? 0 : Number(Math.max(0, Number(order.total || 0) - paidEur).toFixed(2))
+  order.cryptoTxHash = payment.txHash || ''
+  order.updatedAt = new Date().toISOString()
+
+  if (!fullyPaid) {
+    order.paymentStatus = 'partially_paid'
+    await notifyCustomerOrderUpdate(order, 'payment_partial')
+    for (const adminId of adminIds) {
+      await sendTelegramMessage(adminId, [
+        '<b>Pagamento crypto parziale rilevato</b>',
+        `<b>Ordine:</b> ${escapeHtml(order.id)}`,
+        `<b>Ricevuto:</b> ${escapeHtml(order.cryptoPaidAmount)} ${escapeHtml(order.cryptoCurrency)}`,
+        `<b>Da integrare:</b> €${escapeHtml(order.cryptoRemainingEur)} · ${escapeHtml(order.cryptoRemainingAmount)} ${escapeHtml(order.cryptoCurrency)}`,
+      ].join('\n'))
+    }
+    return true
+  }
+
   order.paymentStatus = 'paid_confirmed'
   if (order.status === 'new') order.status = 'processing'
-  order.cryptoPaidAt = new Date().toISOString()
-  order.cryptoPaidAmount = payment.amount
-  order.cryptoTxHash = payment.txHash || ''
-  order.updatedAt = order.cryptoPaidAt
-
+  order.cryptoPaidAt = order.updatedAt
   await notifyCustomerOrderUpdate(order, 'payment_confirmed')
 
   for (const adminId of adminIds) {
@@ -719,6 +805,7 @@ async function confirmCryptoPayment(order, payment) {
       order.cryptoTxHash ? `<b>TX:</b> <code>${escapeHtml(order.cryptoTxHash)}</code>` : '',
     ].filter(Boolean).join('\n'))
   }
+  return true
 }
 
 async function checkPendingCryptoPayments() {
@@ -728,8 +815,7 @@ async function checkPendingCryptoPayments() {
     try {
       const payment = await findCryptoPayment(order)
       if (!payment) continue
-      await confirmCryptoPayment(order, payment)
-      changed = true
+      changed = await updateCryptoPayment(order, payment) || changed
     } catch (error) {
       console.error(`Crypto payment check failed for ${order.id}:`, error.message)
     }
@@ -864,6 +950,10 @@ app.post('/api/orders', async (req, res) => {
     cryptoRateEur: cryptoPayment ? rates[cryptoCurrency] : 0,
     cryptoRateAt: cryptoPayment ? new Date().toISOString() : '',
     cryptoPaymentUri: cryptoPayment ? cryptoPaymentUri(cryptoCurrency, cryptoPayment.address, cryptoExpectedAmount) : '',
+    cryptoPaidAmount: '',
+    cryptoPaidEur: 0,
+    cryptoRemainingAmount: cryptoExpectedAmount,
+    cryptoRemainingEur: cryptoPayment ? subtotal + fees : 0,
     customer,
     notificationsEnabled: req.body.notificationsEnabled !== false,
     trackingNumber: '',
@@ -901,15 +991,25 @@ app.get('/api/orders/:id/public', async (req, res) => {
   if (!order) return res.status(404).json({ error: 'Order not found' })
   res.json({
     id: order.id,
+    createdAt: order.createdAt,
     status: order.status,
+    payment: order.payment,
+    total: order.total,
     paymentStatus: order.paymentStatus,
     trackingNumber: order.trackingNumber || '',
     trackingProvider: order.trackingProvider || '',
     trackingUrl: order.trackingUrl || '',
     cryptoExpectedAmount: order.cryptoExpectedAmount || '',
     cryptoExpectedUnit: order.cryptoExpectedUnit || '',
+    cryptoCurrency: order.cryptoCurrency || '',
+    cryptoNetwork: order.cryptoNetwork || '',
     cryptoWallet: order.cryptoWallet || '',
+    cryptoRateEur: order.cryptoRateEur || 0,
     cryptoPaymentUri: order.cryptoPaymentUri || '',
+    cryptoPaidAmount: order.cryptoPaidAmount || '',
+    cryptoPaidEur: order.cryptoPaidEur || 0,
+    cryptoRemainingAmount: order.cryptoRemainingAmount || order.cryptoExpectedAmount || '',
+    cryptoRemainingEur: order.cryptoRemainingEur ?? order.total ?? 0,
     cryptoTxHash: order.cryptoTxHash || '',
   })
 })
@@ -920,7 +1020,7 @@ app.post('/api/orders/:id/crypto-paid', async (req, res) => {
   if (!order) return res.status(404).json({ error: 'Order not found' })
   if (order.payment !== 'crypto') return res.status(400).json({ error: 'Order is not crypto' })
 
-  order.paymentStatus = 'paid_reported'
+  if (order.paymentStatus !== 'partially_paid') order.paymentStatus = 'paid_reported'
   order.paymentProof = String(req.body.txHash || '').trim()
   order.updatedAt = new Date().toISOString()
   await writeJson(ordersFile, orders)
@@ -1010,6 +1110,24 @@ app.get('/api/admin/stats', requireAdmin, async (_req, res) => {
 
 app.get('/api/admin/products', requireAdmin, async (_req, res) => {
   res.json(await readJson(productsFile, []))
+})
+
+app.post('/api/admin/media/images', requireAdmin, imageUpload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Carica un file JPG, PNG, WEBP, GIF o AVIF.' })
+  res.status(201).json({ url: `/media/${req.file.filename}` })
+})
+
+app.post('/api/admin/media/videos', requireAdmin, videoUpload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Carica un file MP4, WEBM o MOV.' })
+  res.status(201).json({ url: `/media/${req.file.filename}` })
+})
+
+app.delete('/api/admin/media', requireAdmin, async (req, res) => {
+  const url = String(req.body.url || '')
+  if (!url.startsWith('/media/')) return res.json({ ok: true })
+  const fileName = path.basename(url)
+  await fs.rm(path.join(mediaDir, fileName), { force: true })
+  res.json({ ok: true })
 })
 
 app.post('/api/admin/products', requireAdmin, async (req, res) => {
@@ -1211,7 +1329,15 @@ app.post('/api/telegram/webhook', async (req, res) => {
   res.json({ ok: true })
 })
 
+app.use((error, _req, res, next) => {
+  if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({ error: 'File troppo grande per il caricamento.' })
+  }
+  return next(error)
+})
+
 app.use(express.static(publicDir))
+app.use('/media', express.static(mediaDir))
 
 app.get(/^\/(?!api\/).*/, (_req, res) => {
   res.sendFile(path.join(publicDir, 'index.html'))

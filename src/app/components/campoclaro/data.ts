@@ -7,6 +7,8 @@ export interface Product {
   prices: Record<string, number>
   filters?: string[]
   strains?: string[]
+  images?: string[]
+  videos?: string[]
   thc: string
   cbd: string
   tags: string[]
@@ -24,6 +26,8 @@ export const FALLBACK_PRODUCTS: Product[] = [
     prices: { '100g': 315, '500g': 1350, '1kg': 2000 },
     filters: ['Club Selection'],
     strains: [],
+    images: [],
+    videos: [],
     thc: 'N/D',
     cbd: 'N/D',
     tags: ['Premium', 'Filtrato'],
@@ -39,6 +43,8 @@ export const FALLBACK_PRODUCTS: Product[] = [
     prices: { '100g': 450, '500g': 1850, '1kg': 3200 },
     filters: ['Club Selection'],
     strains: ['Exotic terps', 'Creamy vibes'],
+    images: [],
+    videos: [],
     thc: 'N/D',
     cbd: 'N/D',
     tags: ['Exotic terps', 'Creamy vibes'],
@@ -54,6 +60,8 @@ export const FALLBACK_PRODUCTS: Product[] = [
     prices: { '100g': 500, '500g': 2400, '1kg': 4200 },
     filters: ['Club Selection'],
     strains: ['Zkittlez', 'Lollipopa', 'Hash Burger', 'Honey x Butter', 'Gush Mints'],
+    images: [],
+    videos: [],
     thc: 'N/D',
     cbd: 'N/D',
     tags: ['Frozen quality', 'Heavy flavour'],

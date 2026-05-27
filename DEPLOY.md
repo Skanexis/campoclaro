@@ -168,9 +168,10 @@ Expected:
 {"ok":true}
 ```
 
-Persistent orders, catalog edits, and site content are stored outside the Git
-checkout in `/opt/campoclaro-data`. Files in `server/data` are initial seed
-files only and are copied on the first start of an empty data directory.
+Persistent orders, catalog edits, uploaded product media, and site content are
+stored outside the Git checkout in `/opt/campoclaro-data`. Files in
+`server/data` are initial seed files only and are copied on the first start of
+an empty data directory.
 
 Register the bot webhook after HTTPS is configured in step 8:
 
@@ -291,6 +292,23 @@ After migration, change the live catalog from the admin panel. Updates to
 `server/data/products.json` are seeds for a new empty installation and do not
 overwrite the persistent catalog on an existing server.
 
+### Product media uploads
+
+The product editor accepts up to 5 images and 8 videos per product. Images are
+limited to 15 MB each and videos to 250 MB each. On an existing VPS, add this
+line inside the active Nginx `server {}` block for `campoclaro.eu`, including
+the HTTPS block created by Certbot:
+
+```nginx
+client_max_body_size 260m;
+```
+
+Then reload Nginx:
+
+```bash
+nginx -t && systemctl reload nginx
+```
+
 On your computer:
 
 ```bash
@@ -310,7 +328,7 @@ docker compose logs -f app
 
 ## 11. Backup Data
 
-Orders and products are stored in:
+Orders, products, and uploaded product media are stored in:
 
 ```text
 /opt/campoclaro-data

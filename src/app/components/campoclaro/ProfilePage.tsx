@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { User, Package, Settings, ChevronRight, Clock, Check, Truck, Shield, LogOut } from 'lucide-react'
 import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
 import { api, Order } from '../../lib/api'
+import { CryptoPaymentModal } from './CryptoPaymentModal'
 import { TelegramStartLogin } from './TelegramStartLogin'
 
 type SidebarSection = 'profile' | 'orders' | 'settings' | 'admin'
@@ -86,10 +87,11 @@ function OrderTimeline({ order }: { order: Order }) {
   )
 }
 
-function OrderCard({ order }: { order: Order }) {
+function OrderCard({ order, onOpenPayment }: { order: Order; onOpenPayment: (order: Order) => void }) {
   const [expanded, setExpanded] = useState(false)
   const statuses = order.delivery === 'meetup' ? MEETUP_STATUS_CONFIG : STATUS_CONFIG
   const status = statuses[order.status] || statuses.new
+  const paymentPending = order.payment === 'crypto' && order.paymentStatus !== 'paid_confirmed'
 
   return (
     <motion.div
@@ -180,6 +182,28 @@ function OrderCard({ order }: { order: Order }) {
                 ))}
               </div>
               {order.delivery !== 'meetup' && <OrderTimeline order={order} />}
+              {paymentPending && (
+                <button
+                  type="button"
+                  onClick={() => onOpenPayment(order)}
+                  style={{
+                    marginTop: 16,
+                    padding: '10px 13px',
+                    background: 'rgba(214,178,94,0.09)',
+                    border: '1px solid rgba(214,178,94,0.28)',
+                    borderRadius: 6,
+                    color: '#D6B25E',
+                    cursor: 'pointer',
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                  }}
+                >
+                  {order.paymentStatus === 'partially_paid' && order.cryptoRemainingEur != null
+                    ? `Completa pagamento · €${order.cryptoRemainingEur}`
+                    : 'Apri pagamento crypto'}
+                </button>
+              )}
               {order.trackingUrl && (
                 <a href={order.trackingUrl} target="_blank" rel="noreferrer" style={{
                   marginTop: 16,
@@ -229,6 +253,7 @@ export function ProfilePage() {
   const [confirmOrders, setConfirmOrders] = useState(true)
   const [newsletterEnabled, setNewsletterEnabled] = useState(false)
   const [newsletterMessage, setNewsletterMessage] = useState('')
+  const [paymentOrder, setPaymentOrder] = useState<Order | null>(null)
   const isAdmin = user?.role === 'admin'
 
   const loadDashboard = async () => {
@@ -508,7 +533,7 @@ export function ProfilePage() {
                   ) : orders.length === 0 ? (
                     <div style={{ color: 'rgba(245,245,245,0.4)', fontSize: '0.84rem' }}>Nessun ordine trovato.</div>
                   ) : orders.map(order => (
-                    <OrderCard key={order.id} order={order} />
+                    <OrderCard key={order.id} order={order} onOpenPayment={setPaymentOrder} />
                   ))}
                 </motion.div>
               )}
@@ -668,6 +693,16 @@ export function ProfilePage() {
           </motion.div>
         </div>
       </div>
+
+      <CryptoPaymentModal
+        order={paymentOrder}
+        open={Boolean(paymentOrder)}
+        onClose={() => setPaymentOrder(null)}
+        onUpdate={updated => {
+          setPaymentOrder(previous => previous ? { ...previous, ...updated } : previous)
+          setOrders(previous => previous.map(order => order.id === updated.id ? { ...order, ...updated } : order))
+        }}
+      />
 
       {/* Mobile: Tabs below header */}
       <style>{`
