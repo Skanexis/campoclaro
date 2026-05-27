@@ -386,7 +386,7 @@ canvas {
 }
 
 .admin-list {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .admin-list-row {

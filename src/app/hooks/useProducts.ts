@@ -10,7 +10,7 @@ export function useProducts() {
     let cancelled = false
     api.getProducts()
       .then(data => {
-        if (!cancelled) setProducts(data)
+        if (!cancelled) setProducts(data.length > 0 ? data : FALLBACK_PRODUCTS)
       })
       .catch(() => {
         if (!cancelled) setProducts(FALLBACK_PRODUCTS)

@@ -445,8 +445,8 @@ export function AdminPage() {
         </div>
 
         {tab === 'orders' && (
-          <motion.div className="admin-list" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ ...panel, overflow: 'hidden' }}>
-            <div className="admin-order-filters" style={{ position: 'sticky', top: 84, zIndex: 5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '12px 14px', background: 'rgba(5,5,5,0.86)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(18px)' }}>
+          <motion.div className="admin-list" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ ...panel, overflow: 'visible' }}>
+            <div className="admin-order-filters" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '12px 14px', background: 'rgba(5,5,5,0.86)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               {[
                 ['all', 'Tutti'],
                 ['new', 'Nuovi'],
@@ -1088,7 +1088,6 @@ export function AdminPage() {
             padding: 8px !important;
           }
           .admin-order-filters {
-            top: 72px !important;
             gap: 6px !important;
             padding: 10px !important;
             flex-wrap: nowrap !important;

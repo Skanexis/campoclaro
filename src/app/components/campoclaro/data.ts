@@ -27,8 +27,8 @@ export const FALLBACK_PRODUCTS: Product[] = [
     thc: 'N/D',
     cbd: 'N/D',
     tags: ['Premium', 'Filtrato'],
-    gradient: 'linear-gradient(135deg, #8B6914 0%, #DAA520 58%, #FFD700 100%)',
-    glowColor: 'rgba(218,165,32,0.16)',
+    gradient: 'linear-gradient(135deg, #08080a 0%, #17131d 55%, #030304 100%)',
+    glowColor: 'rgba(214,178,94,0.12)',
   },
   {
     id: 'cali-spain-sherbet',
@@ -42,8 +42,8 @@ export const FALLBACK_PRODUCTS: Product[] = [
     thc: 'N/D',
     cbd: 'N/D',
     tags: ['Exotic terps', 'Creamy vibes'],
-    gradient: 'linear-gradient(135deg, #FF6B9D 0%, #FFA500 40%, #00D4FF 100%)',
-    glowColor: 'rgba(255,107,157,0.16)',
+    gradient: 'linear-gradient(135deg, #08080a 0%, #17131d 55%, #030304 100%)',
+    glowColor: 'rgba(214,178,94,0.12)',
   },
   {
     id: 'frozen-moe-farm',
@@ -57,7 +57,7 @@ export const FALLBACK_PRODUCTS: Product[] = [
     thc: 'N/D',
     cbd: 'N/D',
     tags: ['Frozen quality', 'Heavy flavour'],
-    gradient: 'linear-gradient(135deg, #071522 0%, #12384a 58%, #030608 100%)',
-    glowColor: 'rgba(120,205,240,0.16)',
+    gradient: 'linear-gradient(135deg, #08080a 0%, #17131d 55%, #030304 100%)',
+    glowColor: 'rgba(214,178,94,0.12)',
   },
 ]

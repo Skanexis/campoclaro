@@ -273,7 +273,7 @@ cd /opt/campoclaro
 docker compose stop app
 mkdir -p /opt/campoclaro-data
 cp -a server/data/. /opt/campoclaro-data/
-git restore server/data server-api.err.log server-api.out.log vite-dev.err.log vite-dev.out.log
+git restore --source=HEAD --staged --worktree -- server/data server-api.err.log server-api.out.log vite-dev.err.log vite-dev.out.log
 git pull
 docker compose up -d --build
 docker compose logs -f app
@@ -282,6 +282,10 @@ docker compose logs -f app
 The `cp` step preserves the live orders and admin catalog edits before Git
 restores the tracked seed files. After this migration, application writes go
 to `/opt/campoclaro-data` and no longer block `git pull`.
+
+The explicit `--staged --worktree` options are required if a data file was
+previously staged on the VPS; plain `git restore` only resets the working copy
+from the already modified index in that case.
 
 After migration, change the live catalog from the admin panel. Updates to
 `server/data/products.json` are seeds for a new empty installation and do not

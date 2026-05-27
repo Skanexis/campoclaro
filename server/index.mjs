@@ -364,6 +364,30 @@ async function initializeDataDir() {
       if (error.code !== 'EEXIST') throw error
     }
   }
+  const products = await readJson(productsFile, [])
+  if (!Array.isArray(products) || products.length === 0) {
+    await fs.copyFile(path.join(seedDataDir, 'products.json'), productsFile)
+    return
+  }
+  const deprecatedGradients = new Set([
+    'linear-gradient(135deg, #8B6914 0%, #DAA520 58%, #FFD700 100%)',
+    'linear-gradient(135deg, #FF6B9D 0%, #FFA500 40%, #00D4FF 100%)',
+    'linear-gradient(135deg, #071522 0%, #12384a 58%, #030608 100%)',
+  ])
+  const seededProductIds = new Set(['filtrato', 'cali-spain-sherbet', 'frozen-moe-farm'])
+  let changed = false
+  const normalizedProducts = products.map(product => {
+    if (!seededProductIds.has(product.id) || !deprecatedGradients.has(product.gradient)) return product
+    changed = true
+    return {
+      ...product,
+      gradient: 'linear-gradient(135deg, #08080a 0%, #17131d 55%, #030304 100%)',
+      glowColor: 'rgba(214,178,94,0.12)',
+    }
+  })
+  if (changed) {
+    await writeJson(productsFile, normalizedProducts)
+  }
 }
 
 function signSession(payload) {
