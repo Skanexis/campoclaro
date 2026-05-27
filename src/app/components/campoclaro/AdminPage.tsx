@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties, ReactNode, Ref } from 'react'
 import { motion } from 'motion/react'
 import { BarChart3, Check, ExternalLink, Film, ImageIcon, LogOut, Mail, Package, Save, Send, ShoppingBag, Trash2, Upload, UserCheck, X } from 'lucide-react'
 import { Product } from './data'
@@ -137,11 +137,13 @@ function Field({
   value,
   onChange,
   textarea = false,
+  inputRef,
 }: {
   label: string
   value: string
   onChange: (value: string) => void
   textarea?: boolean
+  inputRef?: Ref<HTMLInputElement>
 }) {
   const common: CSSProperties = {
     width: '100%',
@@ -164,9 +166,191 @@ function Field({
       {textarea ? (
         <textarea value={value} onChange={e => onChange(e.target.value)} rows={4} style={{ ...common, resize: 'vertical' }} />
       ) : (
-        <input value={value} onChange={e => onChange(e.target.value)} style={common} />
+        <input ref={inputRef} value={value} onChange={e => onChange(e.target.value)} style={common} />
       )}
     </label>
+  )
+}
+
+function AdminSectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.35)', marginBottom: 9 }}>
+      {children}
+    </div>
+  )
+}
+
+function AdminPanelHeader({
+  eyebrow,
+  title,
+  meta,
+  action,
+}: {
+  eyebrow: string
+  title: string
+  meta?: Array<{ label: string; value: ReactNode }>
+  action?: ReactNode
+}) {
+  return (
+    <div className="admin-panel-header">
+      <div>
+        <div className="admin-panel-eyebrow">{eyebrow}</div>
+        <h2>{title}</h2>
+      </div>
+      <div className="admin-panel-header-side">
+        {meta && meta.length > 0 && (
+          <div className="admin-panel-meta">
+            {meta.map(item => (
+              <span key={item.label}>
+                <strong>{item.value}</strong>
+                {item.label}
+              </span>
+            ))}
+          </div>
+        )}
+        {action}
+      </div>
+    </div>
+  )
+}
+
+function AdminFormBlock({
+  title,
+  children,
+  className = '',
+}: {
+  title: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <section className={`admin-form-block ${className}`}>
+      <AdminSectionLabel>{title}</AdminSectionLabel>
+      {children}
+    </section>
+  )
+}
+
+function ListEditor({
+  label,
+  items,
+  onChange,
+  placeholder,
+  addLabel,
+  maxItems,
+  showLabel = true,
+}: {
+  label: string
+  items: string[]
+  onChange: (items: string[]) => void
+  placeholder: string
+  addLabel: string
+  maxItems?: number
+  showLabel?: boolean
+}) {
+  const updateItem = (index: number, value: string) => {
+    onChange(items.map((item, i) => i === index ? value : item))
+  }
+  const removeItem = (index: number) => {
+    onChange(items.filter((_, i) => i !== index))
+  }
+  const addItem = () => {
+    if (maxItems && items.length >= maxItems) return
+    onChange([...items, ''])
+  }
+
+  return (
+    <div>
+      {showLabel && <AdminSectionLabel>{label}</AdminSectionLabel>}
+      <div style={{ display: 'grid', gap: 8 }}>
+        {items.length === 0 ? (
+          <div style={{ padding: '10px 12px', borderRadius: 6, border: '1px dashed rgba(255,255,255,0.12)', color: 'rgba(245,245,245,0.34)', fontFamily: "'Inter', sans-serif", fontSize: '0.78rem' }}>
+            Nessun valore.
+          </div>
+        ) : items.map((item, index) => (
+          <div key={index} className="admin-inline-row admin-list-editor-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
+            <input
+              value={item}
+              placeholder={placeholder}
+              onChange={event => updateItem(index, event.target.value)}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 6, color: '#F5F5F5', fontFamily: "'Inter', sans-serif", fontSize: '0.86rem' }}
+            />
+            <button type="button" title="Rimuovi" onClick={() => removeItem(index)} style={{ width: 40, borderRadius: 6, border: '1px solid rgba(229,115,115,0.24)', background: 'rgba(229,115,115,0.08)', color: '#E57373', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addItem}
+          disabled={Boolean(maxItems && items.length >= maxItems)}
+          style={{ justifySelf: 'start', padding: '8px 11px', borderRadius: 6, border: '1px solid rgba(214,178,94,0.28)', background: 'rgba(214,178,94,0.08)', color: '#D6B25E', cursor: maxItems && items.length >= maxItems ? 'not-allowed' : 'pointer', opacity: maxItems && items.length >= maxItems ? 0.55 : 1 }}
+        >
+          + {addLabel}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function PriceEditor({
+  prices,
+  onChange,
+  showLabel = true,
+}: {
+  prices: Record<string, number>
+  onChange: (prices: Record<string, number>) => void
+  showLabel?: boolean
+}) {
+  const rows = Object.entries(prices)
+  const setRows = (nextRows: Array<[string, number]>) => {
+    onChange(Object.fromEntries(nextRows))
+  }
+
+  const updateRow = (index: number, field: 'weight' | 'price', value: string) => {
+    setRows(rows.map((row, i) => {
+      if (i !== index) return row
+      return field === 'weight' ? [value, row[1]] : [row[0], value === '' ? Number.NaN : Number(value)]
+    }))
+  }
+
+  return (
+    <div>
+      {showLabel && <AdminSectionLabel>Prezzi</AdminSectionLabel>}
+      <div style={{ display: 'grid', gap: 8 }}>
+        {rows.length === 0 ? (
+          <div style={{ padding: '10px 12px', borderRadius: 6, border: '1px dashed rgba(255,255,255,0.12)', color: 'rgba(245,245,245,0.34)', fontFamily: "'Inter', sans-serif", fontSize: '0.78rem' }}>
+            Aggiungi almeno un formato e un prezzo.
+          </div>
+        ) : rows.map(([weight, price], index) => (
+          <div key={`${weight}-${index}`} className="admin-price-row" style={{ display: 'grid', gridTemplateColumns: '1fr minmax(110px, 0.7fr) auto', gap: 8 }}>
+            <input value={weight} placeholder="100g" onChange={event => updateRow(index, 'weight', event.target.value)} style={{ minWidth: 0, padding: '10px 12px', borderRadius: 6, color: '#F5F5F5', fontFamily: "'Inter', sans-serif", fontSize: '0.86rem' }} />
+            <input type="number" min="0" step="1" value={Number.isFinite(price) ? price : ''} placeholder="500" onChange={event => updateRow(index, 'price', event.target.value)} style={{ minWidth: 0, padding: '10px 12px', borderRadius: 6, color: '#F5F5F5', fontFamily: "'Inter', sans-serif", fontSize: '0.86rem' }} />
+            <button type="button" title="Rimuovi" onClick={() => setRows(rows.filter((_, i) => i !== index))} style={{ width: 40, borderRadius: 6, border: '1px solid rgba(229,115,115,0.24)', background: 'rgba(229,115,115,0.08)', color: '#E57373', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {['100g', '500g', '1kg'].map(weight => (
+            <button
+              key={weight}
+              type="button"
+              onClick={() => {
+                if (Object.prototype.hasOwnProperty.call(prices, weight)) return
+                onChange({ ...prices, [weight]: 0 })
+              }}
+              style={{ padding: '8px 11px', borderRadius: 6, border: '1px solid rgba(214,178,94,0.28)', background: 'rgba(214,178,94,0.08)', color: '#D6B25E', cursor: 'pointer' }}
+            >
+              + {weight}
+            </button>
+          ))}
+          <button type="button" onClick={() => onChange({ ...prices, [`Formato ${rows.length + 1}`]: 0 })} style={{ padding: '8px 11px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)', color: 'rgba(245,245,245,0.62)', cursor: 'pointer' }}>
+            + Altro
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -246,6 +430,8 @@ export function AdminPage() {
   const [mediaUploading, setMediaUploading] = useState<ProductMediaKey | ''>('')
   const [removedMedia, setRemovedMedia] = useState<string[]>([])
   const [orderFilter, setOrderFilter] = useState<'all' | 'new' | 'paid' | 'shipped' | 'completed' | 'meetup'>('all')
+  const productFormRef = useRef<HTMLDivElement>(null)
+  const productNameRef = useRef<HTMLInputElement>(null)
 
   const loadAdmin = async () => {
     const [statsData, orderData, productData, contentData] = await Promise.all([api.adminStats(), api.adminOrders(), api.adminProducts(), api.adminSiteContent()])
@@ -268,6 +454,8 @@ export function AdminPage() {
   }, [])
 
   const sortedProducts = useMemo(() => [...products].sort((a, b) => a.name.localeCompare(b.name)), [products])
+  const visibleProducts = useMemo(() => products.filter(product => product.active !== false).length, [products])
+  const hiddenProducts = products.length - visibleProducts
   const filteredOrders = useMemo(() => orders.filter(order => {
     if (orderFilter === 'all') return true
     if (orderFilter === 'paid') return order.paymentStatus === 'paid_reported' || order.paymentStatus === 'paid_confirmed'
@@ -281,13 +469,23 @@ export function AdminPage() {
       setMessage('Attendi la fine del caricamento media.')
       return
     }
-    if (Object.keys(editing.prices).length === 0) {
+    const cleanProduct = {
+      ...editing,
+      prices: Object.fromEntries(
+        Object.entries(editing.prices || {})
+          .map(([weight, price]) => [weight.trim(), Number(price)] as [string, number])
+          .filter(([weight, price]) => weight && Number.isFinite(price))
+      ),
+      strains: (editing.strains || []).map(item => item.trim()).filter(Boolean),
+      tags: (editing.tags || []).map(item => item.trim()).filter(Boolean).slice(0, 2),
+    }
+    if (Object.keys(cleanProduct.prices).length === 0) {
       setMessage('Inserisci i prezzi, ad esempio: 100g: 500, 500g: 2400')
       return
     }
     try {
       await api.saveSiteContent(siteContent)
-      const saved = await api.saveProduct(editing)
+      const saved = await api.saveProduct(cleanProduct)
       await Promise.all(removedMedia.map(url => api.deleteProductMedia(url).catch(() => undefined)))
       setMessage('Prodotto salvato')
       setEditing(saved)
@@ -368,12 +566,19 @@ export function AdminPage() {
     setEditing({ ...EMPTY_PRODUCT, prices: {}, strains: [], tags: [] })
     setPricesInput('')
     setRemovedMedia([])
+    window.setTimeout(() => {
+      productFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      productNameRef.current?.focus()
+    }, 0)
   }
 
   const selectProduct = (product: Product & { active?: boolean }) => {
     setEditing({ ...product, originalId: product.id })
     setPricesInput(formatPrices(product.prices))
     setRemovedMedia([])
+    window.setTimeout(() => {
+      productFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 0)
   }
 
   const uploadProductMedia = async (files: FileList | null, key: ProductMediaKey) => {
@@ -493,7 +698,7 @@ export function AdminPage() {
             { id: 'contacts', label: 'Contatti' },
             { id: 'newsletter', label: 'Newsletter' },
           ].map(item => (
-            <button key={item.id} className="admin-tab" onClick={() => setTab(item.id as AdminTab)} style={{ padding: '9px 18px', borderRadius: 20, background: tab === item.id ? 'rgba(214,178,94,0.16)' : 'transparent', border: tab === item.id ? '1px solid rgba(214,178,94,0.55)' : '1px solid rgba(255,255,255,0.08)', color: tab === item.id ? '#F0C96A' : 'rgba(245,245,245,0.58)', cursor: 'pointer' }}>
+            <button key={item.id} className="admin-tab" onClick={() => { setTab(item.id as AdminTab); setMessage('') }} style={{ padding: '9px 18px', borderRadius: 20, background: tab === item.id ? 'rgba(214,178,94,0.16)' : 'transparent', border: tab === item.id ? '1px solid rgba(214,178,94,0.55)' : '1px solid rgba(255,255,255,0.08)', color: tab === item.id ? '#F0C96A' : 'rgba(245,245,245,0.58)', cursor: 'pointer' }}>
               {item.label}
             </button>
           ))}
@@ -501,6 +706,16 @@ export function AdminPage() {
 
         {tab === 'orders' && (
           <motion.div className="admin-list" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ ...panel, overflow: 'visible' }}>
+            <AdminPanelHeader
+              eyebrow="Ordini"
+              title="Vista operativa"
+              meta={[
+                { label: 'totali', value: orders.length },
+                { label: 'visibili', value: filteredOrders.length },
+                { label: 'nuovi', value: orders.filter(order => order.status === 'new').length },
+                { label: 'meetup', value: orders.filter(order => order.delivery === 'meetup').length },
+              ]}
+            />
             <div className="admin-order-filters" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '12px 14px', background: 'rgba(5,5,5,0.86)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               {[
                 ['all', 'Tutti'],
@@ -548,6 +763,9 @@ export function AdminPage() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 7 }}>
                             <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.86rem', fontWeight: 700, color: '#D6B25E' }}>{order.id}</span>
                             <StatusBadge status={order.status} meetup={isMeetup} />
+                          </div>
+                          <div style={{ color: '#F5F5F5', fontFamily: "'Satoshi', sans-serif", fontWeight: 700, marginBottom: 5 }}>
+                            {customerName}
                           </div>
                           <div style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.38)', fontSize: '0.74rem' }}>
                             {new Date(order.createdAt).toLocaleString('it-IT')}
@@ -672,37 +890,107 @@ export function AdminPage() {
         )}
 
         {tab === 'products' && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 18 }} className="admin-products">
-            <div className="admin-product-list" style={{ ...panel, overflow: 'hidden' }}>
-              <button onClick={startNewProduct} style={{ width: '100%', padding: 14, background: 'rgba(214,178,94,0.08)', border: 'none', color: '#D6B25E', cursor: 'pointer', textAlign: 'left' }}>
-                + Nuovo prodotto
-              </button>
-              {sortedProducts.map(product => (
-                <button key={product.id} className="admin-product-item" onClick={() => selectProduct(product)} style={{ width: '100%', padding: 14, background: (editing.originalId || editing.id) === product.id ? 'rgba(255,255,255,0.06)' : 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,0.05)', color: '#F5F5F5', cursor: 'pointer', textAlign: 'left' }}>
-                  <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700 }}>{product.name}</div>
-                  <div style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.34)', fontSize: '0.74rem', marginTop: 4 }}>
-                    {(product.filters || []).join(', ') || 'Senza filtri'}
-                  </div>
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="admin-catalog-view">
+            <AdminPanelHeader
+              eyebrow="Catalogo"
+              title={editing.id ? editing.name : 'Nuovo prodotto'}
+              meta={[
+                { label: 'prodotti', value: products.length },
+                { label: 'attivi', value: visibleProducts },
+                { label: 'nascosti', value: hiddenProducts },
+              ]}
+              action={(
+                <button onClick={startNewProduct} className="admin-primary-soft-button">
+                  + Nuovo prodotto
                 </button>
-              ))}
+              )}
+            />
+            <div className="admin-products" style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 18 }}>
+            <div className="admin-product-list" style={{ ...panel, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <div className="admin-list-title">
+                <span>Prodotti</span>
+                <strong>{products.length}</strong>
+              </div>
+              <div className="admin-product-list-scroll">
+                {sortedProducts.map(product => (
+                  <button key={product.id} className="admin-product-item" onClick={() => selectProduct(product)} style={{ width: '100%', padding: 14, background: (editing.originalId || editing.id) === product.id ? 'rgba(255,255,255,0.06)' : 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,0.05)', color: '#F5F5F5', cursor: 'pointer', textAlign: 'left' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 5 }}>
+                      <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700 }}>{product.name}</div>
+                      <span style={{ flexShrink: 0, fontFamily: "'Inter', sans-serif", fontSize: '0.62rem', color: product.active === false ? '#E57373' : '#6ECF95' }}>
+                        {product.active === false ? 'Nascosto' : 'Attivo'}
+                      </span>
+                    </div>
+                    <div style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.38)', fontSize: '0.72rem', marginBottom: 7 }}>
+                      {(product.filters || []).join(', ') || 'Senza filtri'}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {Object.entries(product.prices || {}).slice(0, 3).map(([weight, price]) => (
+                        <span key={weight} className="admin-mini-pill">{weight} €{price}</span>
+                      ))}
+                      {(product.images?.length || 0) > 0 && <span className="admin-mini-pill">{product.images?.length} foto</span>}
+                      {(product.videos?.length || 0) > 0 && <span className="admin-mini-pill">{product.videos?.length} video</span>}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="admin-form-panel" style={{ ...panel, padding: 18 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }} className="admin-form">
-                <Field label="Nome" value={editing.name} onChange={v => setEditing(p => ({ ...p, name: v }))} />
-                <Field label="Prezzi (es. 100g: 500, 500g: 2400)" value={pricesInput} onChange={v => {
-                  setPricesInput(v)
-                  setEditing(p => ({ ...p, prices: parsePrices(v) }))
-                }} />
-                <Field label="Strains (separati da virgola)" value={(editing.strains || []).join(', ')} onChange={v => setEditing(p => ({ ...p, strains: parseCommaList(v) }))} />
-                <Field label="Card badges max 2" value={editing.tags.slice(0, 2).join(', ')} onChange={v => setEditing(p => ({ ...p, tags: v.split(',').map(s => s.trim()).filter(Boolean).slice(0, 2) }))} />
-                <div style={{ gridColumn: '1 / -1', fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.36)' }}>
-                  {editing.id ? `ID: ${editing.id}` : 'ID viene creato automaticamente dal nome al salvataggio.'}
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.35)', marginBottom: 10 }}>
-                    Visual preset
+            <div ref={productFormRef} className="admin-form-panel" style={{ ...panel, padding: 18 }}>
+              <div className="admin-form-layout">
+                <AdminFormBlock title="Base" className="admin-form-block-wide">
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 14, alignItems: 'end' }} className="admin-form">
+                    <Field label="Nome" value={editing.name} onChange={v => setEditing(p => ({ ...p, name: v }))} inputRef={productNameRef} />
+                    <button
+                      type="button"
+                      onClick={() => setEditing(p => ({ ...p, active: p.active === false }))}
+                      style={{
+                        height: 39,
+                        padding: '0 12px',
+                        background: editing.active === false ? 'rgba(229,115,115,0.08)' : 'rgba(214,178,94,0.08)',
+                        border: editing.active === false ? '1px solid rgba(229,115,115,0.24)' : '1px solid rgba(214,178,94,0.24)',
+                        borderRadius: 6,
+                        color: editing.active === false ? '#E57373' : '#D6B25E',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {editing.active === false ? 'Nascosto' : 'Attivo'}
+                    </button>
                   </div>
+                  <div style={{ marginTop: 12, fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.36)' }}>
+                    {editing.id ? `ID: ${editing.id}` : 'ID automatico dopo il primo salvataggio'}
+                  </div>
+                </AdminFormBlock>
+
+                <AdminFormBlock title="Prezzi" className="admin-price-editor">
+                  <PriceEditor prices={editing.prices || {}} showLabel={false} onChange={prices => {
+                    setEditing(p => ({ ...p, prices }))
+                    setPricesInput(formatPrices(prices))
+                  }} />
+                </AdminFormBlock>
+
+                <AdminFormBlock title="Varianti e badges">
+                  <div style={{ display: 'grid', gap: 14 }}>
+                    <ListEditor
+                      label="Strains"
+                      items={editing.strains || []}
+                      placeholder="Zkittlez"
+                      addLabel="Strain"
+                      showLabel={false}
+                      onChange={strains => setEditing(p => ({ ...p, strains }))}
+                    />
+                    <ListEditor
+                      label="Card badges"
+                      items={(editing.tags || []).slice(0, 2)}
+                      placeholder="Premium"
+                      addLabel="Badge"
+                      maxItems={2}
+                      showLabel={false}
+                      onChange={tags => setEditing(p => ({ ...p, tags: tags.slice(0, 2) }))}
+                    />
+                  </div>
+                </AdminFormBlock>
+
+                <AdminFormBlock title="Aspetto" className="admin-form-block-wide">
                   <div className="admin-preset-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(88px, 1fr))', gap: 8 }}>
                   {PRODUCT_PRESETS.map(preset => (
                     <button
@@ -729,27 +1017,9 @@ export function AdminPage() {
                     </button>
                   ))}
                   </div>
-                </div>
-                <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={() => setEditing(p => ({ ...p, active: p.active === false }))}
-                    style={{
-                      padding: '8px 12px',
-                      background: editing.active === false ? 'rgba(229,115,115,0.08)' : 'rgba(214,178,94,0.08)',
-                      border: editing.active === false ? '1px solid rgba(229,115,115,0.24)' : '1px solid rgba(214,178,94,0.24)',
-                      borderRadius: 6,
-                      color: editing.active === false ? '#E57373' : '#D6B25E',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {editing.active === false ? 'Nascosto' : 'Attivo'}
-                  </button>
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.35)', marginBottom: 9 }}>
-                    Filtri prodotto
-                  </div>
+                </AdminFormBlock>
+
+                <AdminFormBlock title="Filtri catalogo" className="admin-form-block-wide">
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {siteContent.productFilters.length === 0 ? (
                       <div style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.34)', fontSize: '0.8rem' }}>
@@ -776,14 +1046,20 @@ export function AdminPage() {
                       )
                     })}
                   </div>
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}><Field label="Descrizione breve" value={editing.description} onChange={v => setEditing(p => ({ ...p, description: v }))} /></div>
-                <div style={{ gridColumn: '1 / -1' }}><Field label="Descrizione lunga" value={editing.longDescription} onChange={v => setEditing(p => ({ ...p, longDescription: v }))} textarea /></div>
+                </AdminFormBlock>
+
+                <AdminFormBlock title="Descrizioni" className="admin-form-block-wide">
+                  <div style={{ display: 'grid', gap: 14 }}>
+                    <Field label="Descrizione breve" value={editing.description} onChange={v => setEditing(p => ({ ...p, description: v }))} />
+                    <Field label="Descrizione lunga" value={editing.longDescription} onChange={v => setEditing(p => ({ ...p, longDescription: v }))} textarea />
+                  </div>
+                </AdminFormBlock>
+
                 {([
                   { key: 'images' as ProductMediaKey, label: 'Foto', limit: 5, accept: 'image/*', icon: <ImageIcon size={15} /> },
                   { key: 'videos' as ProductMediaKey, label: 'Video', limit: 8, accept: 'video/*', icon: <Film size={15} /> },
                 ]).map(media => (
-                  <div key={media.key} className="admin-media-block" style={{ gridColumn: '1 / -1', padding: 12, border: '1px solid rgba(255,255,255,0.07)', borderRadius: 7, background: 'rgba(255,255,255,0.018)' }}>
+                  <div key={media.key} className="admin-media-block admin-form-block-wide" style={{ padding: 12, border: '1px solid rgba(255,255,255,0.07)', borderRadius: 7, background: 'rgba(255,255,255,0.018)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.58)' }}>
                         {media.icon} {media.label} ({editing[media.key]?.length || 0}/{media.limit})
@@ -826,10 +1102,10 @@ export function AdminPage() {
                     )}
                   </div>
                 ))}
-                <div style={{ gridColumn: '1 / -1', ...panel, padding: 14, background: editing.gradient }}>
+                <div className="admin-form-block-wide" style={{ ...panel, padding: 14, background: editing.gradient }}>
                   <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, color: '#F5F5F5', marginBottom: 8 }}>{editing.name || 'Preview prodotto'}</div>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-                    {editing.tags.slice(0, 2).map(tag => (
+                    {editing.tags.map(tag => tag.trim()).filter(Boolean).slice(0, 2).map(tag => (
                       <span key={tag} style={{ padding: '3px 8px', background: 'rgba(5,5,5,0.66)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 3, fontSize: '0.6rem', color: 'rgba(245,245,245,0.55)' }}>{tag}</span>
                     ))}
                   </div>
@@ -848,27 +1124,25 @@ export function AdminPage() {
               </div>
               {message && <div style={{ marginTop: 14, color: '#D6B25E', fontFamily: "'Inter', sans-serif", fontSize: '0.8rem' }}>{message}</div>}
             </div>
+            </div>
           </motion.div>
         )}
 
         {tab === 'filters' && (
           <motion.div className="admin-form-panel" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ ...panel, padding: 18 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 18 }}>
-              <div>
-                <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.35)', marginBottom: 6 }}>
-                  Filtri catalogo
-                </div>
-                <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.82rem', color: 'rgba(245,245,245,0.44)', lineHeight: 1.55 }}>
-                  Crea qui le categorie filtro visibili nel catalogo. Poi assegnale ai prodotti nella scheda Catalogo.
-                </div>
-              </div>
-              <button
-                onClick={() => setSiteContent(p => ({ ...p, productFilters: [...p.productFilters, `Filtro ${p.productFilters.length + 1}`] }))}
-                style={{ padding: '10px 14px', background: 'rgba(214,178,94,0.1)', border: '1px solid rgba(214,178,94,0.32)', borderRadius: 6, color: '#D6B25E', cursor: 'pointer', whiteSpace: 'nowrap' }}
-              >
-                + Nuovo filtro
-              </button>
-            </div>
+            <AdminPanelHeader
+              eyebrow="Catalogo"
+              title="Filtri"
+              meta={[{ label: 'filtri', value: siteContent.productFilters.length }]}
+              action={(
+                <button
+                  className="admin-primary-soft-button"
+                  onClick={() => setSiteContent(p => ({ ...p, productFilters: [...p.productFilters, `Filtro ${p.productFilters.length + 1}`] }))}
+                >
+                  + Nuovo filtro
+                </button>
+              )}
+            />
 
             <div style={{ display: 'grid', gap: 12 }}>
               {siteContent.productFilters.length === 0 ? (
@@ -897,6 +1171,15 @@ export function AdminPage() {
 
         {tab === 'contacts' && (
           <motion.div className="admin-form-panel" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ ...panel, padding: 18 }}>
+            <AdminPanelHeader
+              eyebrow="Sito"
+              title="Home e contatti"
+              meta={[
+                { label: 'info', value: siteContent.infoCards.length },
+                { label: 'filtri', value: siteContent.productFilters.length },
+                { label: 'link', value: siteContent.contacts.length },
+              ]}
+            />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }} className="admin-form">
               <Field label="Titolo home" value={siteContent.welcomeTitle} onChange={v => setSiteContent(p => ({ ...p, welcomeTitle: v }))} />
               <Field label="Sottotitolo home" value={siteContent.welcomeSubtitle} onChange={v => setSiteContent(p => ({ ...p, welcomeSubtitle: v }))} />
@@ -987,6 +1270,11 @@ export function AdminPage() {
 
         {tab === 'newsletter' && (
           <motion.div className="admin-form-panel" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ ...panel, padding: 18 }}>
+            <AdminPanelHeader
+              eyebrow="Telegram"
+              title="Newsletter"
+              meta={[{ label: 'destinatari', value: stats.newsletterSubscribers || 0 }]}
+            />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 18 }} className="admin-products">
               <div>
                 <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.35)', marginBottom: 14 }}>
@@ -1168,6 +1456,24 @@ export function AdminPage() {
             font-size: 0.76rem;
             text-align: center;
           }
+          .admin-panel-header {
+            display: grid;
+            gap: 10px;
+            padding: 13px !important;
+          }
+          .admin-form-panel > .admin-panel-header {
+            margin: -18px -18px 14px;
+          }
+          .admin-panel-header-side,
+          .admin-panel-meta {
+            justify-content: flex-start;
+          }
+          .admin-catalog-view > .admin-panel-header {
+            padding: 0 !important;
+          }
+          .admin-form-layout {
+            grid-template-columns: 1fr;
+          }
           .admin-row,
           .admin-products,
           .admin-filter-row,
@@ -1256,6 +1562,7 @@ export function AdminPage() {
           }
           .admin-product-list {
             max-height: 38vh;
+            position: static;
           }
         }
         @media (max-width: 560px) {

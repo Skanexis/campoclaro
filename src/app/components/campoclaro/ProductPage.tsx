@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { ArrowLeft, Plus, Minus, ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCart } from '../../context/CartContext'
 import { useProducts } from '../../hooks/useProducts'
+import { ProductMediaPreview } from './ProductMediaPreview'
 
 export function ProductPage() {
   const { id } = useParams<{ id: string }>()
@@ -134,11 +135,13 @@ export function ProductPage() {
                   }}
                 >
                   {activeMedia ? (
-                    activeMedia.type === 'image' ? (
-                      <img src={activeMedia.url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <video src={activeMedia.url} controls playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#050505' }} />
-                    )
+                    <ProductMediaPreview
+                      image={activeMedia.type === 'image' ? activeMedia.url : undefined}
+                      video={activeMedia.type === 'video' ? activeMedia.url : undefined}
+                      alt={product.name}
+                      fit={activeMedia.type === 'video' ? 'contain' : 'cover'}
+                      controls={activeMedia.type === 'video'}
+                    />
                   ) : (
                     <>
                       <motion.div
@@ -254,11 +257,11 @@ export function ProductPage() {
                   }}
                 >
                   {'url' in visual ? (
-                    visual.type === 'image' ? (
-                      <img src={visual.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <video src={visual.url} muted playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    )
+                    <ProductMediaPreview
+                      image={visual.type === 'image' ? visual.url : undefined}
+                      video={visual.type === 'video' ? visual.url : undefined}
+                      alt=""
+                    />
                   ) : (
                     <div style={{
                       width: 20,
@@ -593,6 +596,10 @@ export function ProductPage() {
             aspect-ratio: 2.2 / 1 !important;
             margin-bottom: 6px !important;
             max-height: 122px !important;
+          }
+          .product-main-visual:has(video) {
+            aspect-ratio: 4 / 5 !important;
+            max-height: min(62vh, 520px) !important;
           }
           .product-thumbs {
             display: none !important;

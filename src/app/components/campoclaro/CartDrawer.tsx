@@ -266,8 +266,10 @@ export function CartDrawer() {
     if (!isOpen) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    document.body.classList.add('cc-cart-open')
     return () => {
       document.body.style.overflow = previousOverflow
+      document.body.classList.remove('cc-cart-open')
     }
   }, [isOpen])
 

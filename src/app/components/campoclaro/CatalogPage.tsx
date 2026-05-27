@@ -6,6 +6,7 @@ import { Product } from './data'
 import { useCart } from '../../context/CartContext'
 import { useProducts } from '../../hooks/useProducts'
 import { useSiteContent } from '../../hooks/useSiteContent'
+import { ProductMediaPreview } from './ProductMediaPreview'
 
 function WeightPill({
   weight,
@@ -86,10 +87,8 @@ function ProductCard({ product }: { product: Product }) {
           position: 'relative',
           overflow: 'hidden',
         }}>
-          {coverImage ? (
-            <img src={coverImage} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          ) : coverVideo ? (
-            <video src={coverVideo} muted playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          {hasMedia ? (
+            <ProductMediaPreview image={coverImage} video={coverVideo} alt={product.name} />
           ) : (
             <>
               <motion.div

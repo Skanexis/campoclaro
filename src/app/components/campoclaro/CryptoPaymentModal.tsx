@@ -59,6 +59,7 @@ export function CryptoPaymentModal({
     if (!open) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    document.body.classList.add('cc-crypto-modal-open')
     closeButtonRef.current?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onCloseRef.current()
@@ -66,6 +67,7 @@ export function CryptoPaymentModal({
     window.addEventListener('keydown', onKeyDown)
     return () => {
       document.body.style.overflow = previousOverflow
+      document.body.classList.remove('cc-crypto-modal-open')
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [open])

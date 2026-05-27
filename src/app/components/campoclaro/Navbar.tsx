@@ -39,6 +39,7 @@ export function Navbar() {
   return (
     <>
       <motion.nav
+        className="cc-navbar"
         animate={{ y: visible ? 0 : -90 }}
         transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
         style={{
