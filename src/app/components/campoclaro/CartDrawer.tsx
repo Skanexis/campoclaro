@@ -227,6 +227,8 @@ export function CartDrawer() {
   const itemKey = (item: { id: string; weight: string; strain?: string }) => `${item.id}-${item.weight}-${item.strain || 'default'}`
   const ccppFee = delivery === 'ship' && payMethod === 'ccpp' ? CCPP_FEE : 0
   const orderTotal = total + ccppFee
+  const meetupDeposit = Number((total * 0.25).toFixed(2))
+  const requiresCryptoPayment = delivery === 'meetup' || payMethod === 'crypto'
   const selectedCrypto = {
     ...CRYPTO_WALLETS[cryptoCurrency],
     ...walletAvailability[cryptoCurrency],
@@ -290,25 +292,25 @@ export function CartDrawer() {
       setOrderError('Compila indirizzo, città e CAP per la spedizione.')
       return
     }
-    if (delivery === 'ship' && payMethod === 'crypto' && selectedWalletBusy) {
-      setOrderError('Wallet occupato. Scegli una valuta disponibile o CCPP.')
+    if (requiresCryptoPayment && selectedWalletBusy) {
+      setOrderError(delivery === 'meetup' ? 'Wallet occupato. Scegli una valuta disponibile.' : 'Wallet occupato. Scegli una valuta disponibile o CCPP.')
       return
     }
-    if (delivery === 'ship' && payMethod === 'crypto' && !selectedCrypto.address) {
-      setOrderError('Wallet crypto non disponibile. Riprova o scegli CCPP.')
+    if (requiresCryptoPayment && !selectedCrypto.address) {
+      setOrderError(delivery === 'meetup' ? 'Wallet crypto non disponibile. Riprova per inviare la richiesta Meetup.' : 'Wallet crypto non disponibile. Riprova o scegli CCPP.')
       return
     }
-    setStep(delivery === 'meetup' ? 'confirm' : 'payment')
+    setStep('payment')
   }
   const handleConfirm = () => setStep('confirm')
   const handlePaymentConfirm = () => {
     setOrderError('')
-    if (delivery === 'ship' && payMethod === 'crypto' && selectedWalletBusy) {
-      setOrderError('Wallet occupato. Scegli una valuta disponibile o CCPP.')
+    if (requiresCryptoPayment && selectedWalletBusy) {
+      setOrderError(delivery === 'meetup' ? 'Wallet occupato. Scegli una valuta disponibile.' : 'Wallet occupato. Scegli una valuta disponibile o CCPP.')
       return
     }
-    if (delivery === 'ship' && payMethod === 'crypto' && !selectedCrypto.address) {
-      setOrderError('Wallet crypto non disponibile. Riprova o scegli CCPP.')
+    if (requiresCryptoPayment && !selectedCrypto.address) {
+      setOrderError(delivery === 'meetup' ? 'Wallet crypto non disponibile. Riprova per inviare la richiesta Meetup.' : 'Wallet crypto non disponibile. Riprova o scegli CCPP.')
       return
     }
     setStep('confirm')
@@ -325,7 +327,7 @@ export function CartDrawer() {
         address,
         courier: delivery === 'ship' ? courier : undefined,
         notificationsEnabled,
-        cryptoCurrency: delivery === 'ship' && payMethod === 'crypto' ? cryptoCurrency : undefined,
+        cryptoCurrency: requiresCryptoPayment ? cryptoCurrency : undefined,
       })
       setLastOrder(order)
       setStep('success')
@@ -402,7 +404,7 @@ export function CartDrawer() {
                 {step !== 'cart' && step !== 'success' && (
                   <motion.button
                     whileTap={{ scale: 0.9 }}
-                    onClick={() => setStep(step === 'payment' || delivery === 'meetup' ? 'cart' : 'payment')}
+                    onClick={() => setStep(step === 'payment' ? 'cart' : 'payment')}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(245,245,245,0.4)', padding: 0, display: 'flex' }}
                   >
                     <ArrowLeft size={18} />
@@ -656,7 +658,7 @@ export function CartDrawer() {
                               }}
                             >
                               <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.5)', lineHeight: 1.6 }}>
-                                Meetup disponibile solo a Barcellona. Invia la richiesta e il team ti contatterà su Telegram per confermare luogo e orario.
+                                Meetup disponibile solo a Barcellona. Per inviare la richiesta è necessario un acconto crypto del 25%: €{meetupDeposit}. Il team ti contatterà su Telegram per luogo e orario.
                               </div>
                             </motion.div>
                           )}
@@ -719,10 +721,19 @@ export function CartDrawer() {
                     <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 16 }}>
                       Metodo di Pagamento
                     </div>
-                    <PaymentCard method="crypto" selected={payMethod === 'crypto'} label="Crypto" subtitle="BTC / ETH / USDT TRC20, pagamento diretto wallet" onSelect={() => setPayMethod('crypto')} />
-                    <PaymentCard method="ccpp" selected={payMethod === 'ccpp'} label="CCPP" subtitle={`Supplemento fisso €${CCPP_FEE} aggiunto al totale`} onSelect={() => setPayMethod('ccpp')} />
+                    {delivery === 'meetup' ? (
+                      <div style={{ padding: '14px', background: 'rgba(214,178,94,0.08)', border: '1px solid rgba(214,178,94,0.3)', borderRadius: 8, marginBottom: 18 }}>
+                        <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.92rem', color: '#F5F5F5', marginBottom: 5 }}>Acconto Meetup · 25%</div>
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.76rem', color: 'rgba(245,245,245,0.52)', lineHeight: 1.5 }}>Pagamento crypto richiesto ora: <span style={{ color: '#D6B25E', fontWeight: 700 }}>€{meetupDeposit}</span> su un totale di €{total}.</div>
+                      </div>
+                    ) : (
+                      <>
+                        <PaymentCard method="crypto" selected={payMethod === 'crypto'} label="Crypto" subtitle="BTC / ETH / USDT TRC20, pagamento diretto wallet" onSelect={() => setPayMethod('crypto')} />
+                        <PaymentCard method="ccpp" selected={payMethod === 'ccpp'} label="CCPP" subtitle={`Supplemento fisso €${CCPP_FEE} aggiunto al totale`} onSelect={() => setPayMethod('ccpp')} />
+                      </>
+                    )}
 
-                    {delivery === 'ship' && payMethod === 'crypto' && (
+                    {requiresCryptoPayment && (
                       <div style={{ marginTop: 14, marginBottom: 20 }}>
                         <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 10 }}>
                           Valuta crypto
@@ -868,10 +879,10 @@ export function CartDrawer() {
                         </div>
                       ) : (
                         <div style={{ marginBottom: 10, fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.5)', lineHeight: 1.5 }}>
-                          Nessuna scelta pagamento online per Meetup. Il team riceverà la richiesta e ti contatterà per confermare i dettagli a Barcellona.
+                          Acconto crypto obbligatorio per Meetup: 25% del totale, pari a €{meetupDeposit}. Il saldo sarà concordato con il team.
                         </div>
                       )}
-                      {delivery === 'ship' && payMethod === 'crypto' && (
+                      {requiresCryptoPayment && (
                         <div style={{ marginBottom: 10 }}>
                           <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.4)', marginBottom: 6 }}>
                             Wallet
@@ -945,8 +956,8 @@ export function CartDrawer() {
                       Ordine Ricevuto
                     </div>
                     <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.85rem', color: 'rgba(245,245,245,0.4)', lineHeight: 1.6, maxWidth: 320, margin: '0 auto' }}>
-                      {delivery === 'ship' && payMethod === 'crypto'
-                        ? `Invia esattamente ${lastOrder?.cryptoExpectedAmount || ''} ${lastOrder?.cryptoExpectedUnit || selectedCrypto.label}. Il sistema verifica automaticamente la blockchain.`
+                      {lastOrder?.payment === 'crypto'
+                        ? `${delivery === 'meetup' ? 'Acconto Meetup 25%: ' : ''}Invia esattamente ${lastOrder?.cryptoExpectedAmount || ''} ${lastOrder?.cryptoExpectedUnit || selectedCrypto.label}. Il sistema verifica automaticamente la blockchain.`
                         : 'Il tuo ordine è stato registrato. Riceverai conferma a breve.'}
                     </div>
                     {lastOrder?.payment === 'crypto' && (
@@ -1022,7 +1033,7 @@ export function CartDrawer() {
                     gap: 8,
                   }}
                 >
-                  {submitting ? 'Invio...' : step === 'cart' ? (delivery === 'meetup' ? 'Richiedi Meetup' : 'Procedi al Pagamento') : step === 'payment' ? 'Conferma' : (delivery === 'meetup' ? 'Invia Richiesta' : 'Invia Ordine')}
+                  {submitting ? 'Invio...' : step === 'cart' ? (delivery === 'meetup' ? "Procedi all'Acconto" : 'Procedi al Pagamento') : step === 'payment' ? 'Conferma' : (delivery === 'meetup' ? 'Invia Richiesta e Paga Acconto' : 'Invia Ordine')}
                   <ChevronRight size={16} />
                 </motion.button>
               </div>

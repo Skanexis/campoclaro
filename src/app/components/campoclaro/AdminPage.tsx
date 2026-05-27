@@ -536,7 +536,11 @@ export function AdminPage() {
                 {filteredOrders.map(order => {
                   const isMeetup = order.delivery === 'meetup'
                   const customerName = [order.customer?.firstName, order.customer?.lastName].filter(Boolean).join(' ') || 'Cliente'
-                  const paymentLabel = order.payment === 'crypto' ? 'Crypto' : order.payment === 'ccpp' ? 'CCPP' : isMeetup ? 'Da concordare' : order.payment
+                  const paymentLabel = isMeetup && order.payment === 'crypto' ? 'Acconto crypto 25%' : order.payment === 'crypto' ? 'Crypto' : order.payment === 'ccpp' ? 'CCPP' : order.payment
+                  const cryptoPaidEur = Number(order.cryptoPaidEur || 0)
+                  const paymentDueEur = Number(order.paymentDueEur ?? order.total)
+                  const paymentRemainingEur = Math.max(0, paymentDueEur - cryptoPaidEur)
+                  const orderRemainingEur = Math.max(0, Number(order.total || 0) - cryptoPaidEur)
                   return (
                     <article key={order.id} className="admin-order-card" style={{ ...panel, padding: 16 }}>
                       <header className="admin-order-card-header" style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 14 }}>
@@ -597,8 +601,26 @@ export function AdminPage() {
                       </div>
 
                       {order.payment === 'crypto' && order.cryptoWallet && (
-                        <div className="admin-order-crypto" style={{ marginBottom: 12, padding: 10, border: '1px solid rgba(214,178,94,0.12)', borderRadius: 7, background: 'rgba(214,178,94,0.035)', fontFamily: "'JetBrains Mono', monospace", color: 'rgba(245,245,245,0.55)', fontSize: '0.7rem', overflowWrap: 'anywhere' }}>
-                          {order.cryptoCurrency} {order.cryptoNetwork} · {order.paymentStatus || 'awaiting_crypto'} · {order.cryptoWallet}
+                        <div className="admin-order-crypto" style={{ marginBottom: 12, padding: 12, border: '1px solid rgba(214,178,94,0.12)', borderRadius: 7, background: 'rgba(214,178,94,0.035)', overflowWrap: 'anywhere' }}>
+                          <div style={{ marginBottom: 10, fontFamily: "'JetBrains Mono', monospace", color: 'rgba(245,245,245,0.55)', fontSize: '0.7rem' }}>
+                            {order.cryptoCurrency} {order.cryptoNetwork} · {order.paymentStatus || 'awaiting_crypto'} · {order.cryptoWallet}
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: isMeetup ? 'repeat(3, minmax(0, 1fr))' : 'repeat(2, minmax(0, 1fr))', gap: 8 }} className="admin-payment-totals">
+                            <div style={{ padding: '8px 9px', borderRadius: 6, background: 'rgba(76,175,125,0.08)', border: '1px solid rgba(76,175,125,0.16)' }}>
+                              <div className="admin-order-label">Pagato</div>
+                              <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#6ECF95', fontWeight: 700 }}>€{cryptoPaidEur.toFixed(2)}</div>
+                            </div>
+                            {isMeetup && (
+                              <div style={{ padding: '8px 9px', borderRadius: 6, background: 'rgba(214,178,94,0.06)', border: '1px solid rgba(214,178,94,0.16)' }}>
+                                <div className="admin-order-label">Manca acconto</div>
+                                <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#D6B25E', fontWeight: 700 }}>€{paymentRemainingEur.toFixed(2)}</div>
+                              </div>
+                            )}
+                            <div style={{ padding: '8px 9px', borderRadius: 6, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                              <div className="admin-order-label">Saldo ordine</div>
+                              <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#F5F5F5', fontWeight: 700 }}>€{orderRemainingEur.toFixed(2)}</div>
+                            </div>
+                          </div>
                         </div>
                       )}
 
@@ -1182,6 +1204,9 @@ export function AdminPage() {
           }
           .admin-order-info-card {
             padding: 8px !important;
+          }
+          .admin-payment-totals {
+            grid-template-columns: 1fr !important;
           }
           .admin-order-item {
             align-items: flex-start;

@@ -55,6 +55,7 @@ const port = Number(process.env.API_PORT || 3001)
 const sessionSecret = process.env.SESSION_SECRET || 'campoclaro-dev-secret'
 const adminIds = new Set((process.env.ADMIN_TELEGRAM_IDS || '').split(',').map(v => v.trim()).filter(Boolean))
 const ccppFee = 50
+const meetupDepositRate = 0.25
 const autoDeliverCheckMs = 60 * 60 * 1000
 const cryptoPaymentCheckMs = Number(process.env.CRYPTO_PAYMENT_CHECK_MS || 120000)
 const cryptoPaymentTolerance = Number(process.env.CRYPTO_PAYMENT_TOLERANCE || 0.005)
@@ -205,6 +206,17 @@ function formatCustomer(customer = {}) {
   return [name, username, id].filter(Boolean).join(' · ') || 'Cliente Telegram non disponibile'
 }
 
+function cryptoPaymentAmounts(order) {
+  const due = Number(order.paymentDueEur ?? order.total ?? 0)
+  const paid = Number(order.cryptoPaidEur || 0)
+  return {
+    due: Number(due.toFixed(2)),
+    paid: Number(Math.min(Number(order.total || due), paid).toFixed(2)),
+    paymentRemaining: Number(Math.max(0, due - paid).toFixed(2)),
+    orderRemaining: Number(Math.max(0, Number(order.total || 0) - paid).toFixed(2)),
+  }
+}
+
 async function getCustomerSupportLink() {
   const content = normalizeSiteContent(await readJson(siteContentFile, defaultSiteContent))
   const contact = content.contacts.find(item => /telegram/i.test(item.label) && item.url)
@@ -238,8 +250,12 @@ async function notifyCustomerOrderUpdate(order, event, { needsSupport = false } 
     `<b>Stato:</b> ${escapeHtml(statusLabel)}`,
   ]
 
+  if (event === 'created' && isMeetup && order.paymentDueEur) {
+    lines.push(`<b>Acconto Meetup 25% da pagare:</b> €${escapeHtml(order.paymentDueEur)}`)
+  }
+
   if (event === 'payment_confirmed') {
-    lines.push(`<b>Pagamento:</b> ${order.payment === 'crypto'
+    lines.push(`<b>${isMeetup ? 'Acconto Meetup 25%' : 'Pagamento'}:</b> ${order.payment === 'crypto'
       ? `${escapeHtml(order.cryptoCurrency)} ${escapeHtml(order.cryptoPaidAmount || '')}`.trim()
       : 'CCPP confermato'}`)
     if (order.cryptoTxHash) lines.push(`TX: <code>${escapeHtml(order.cryptoTxHash)}</code>`)
@@ -303,6 +319,7 @@ async function notifyAdmins(order, reason = 'Nuovo ordine') {
     : order.payment === 'ccpp'
       ? `CCPP · ${escapeHtml(order.paymentStatus)}`
       : 'Meetup / da concordare'
+  const cryptoAmounts = order.payment === 'crypto' ? cryptoPaymentAmounts(order) : null
   const lines = [
     `<b>${escapeHtml(reason)}</b>`,
     `<b>Ordine:</b> ${escapeHtml(order.id)}`,
@@ -311,6 +328,10 @@ async function notifyAdmins(order, reason = 'Nuovo ordine') {
     order.courier ? `<b>Corriere scelto:</b> ${escapeHtml(order.courier)}` : '',
     `<b>Pagamento:</b> ${paymentLabel}`,
     `<b>Totale:</b> €${order.total}`,
+    isMeetup && order.paymentDueEur ? `<b>Acconto Meetup 25%:</b> €${order.paymentDueEur}` : '',
+    cryptoAmounts ? `<b>Gia pagato:</b> €${cryptoAmounts.paid}` : '',
+    cryptoAmounts && isMeetup ? `<b>Manca per acconto:</b> €${cryptoAmounts.paymentRemaining}` : '',
+    cryptoAmounts ? `<b>Saldo ordine restante:</b> €${cryptoAmounts.orderRemaining}` : '',
     '',
     '<b>Prodotti</b>',
     formatOrderItems(order.items),
@@ -335,10 +356,13 @@ async function notifyAdmins(order, reason = 'Nuovo ordine') {
   for (const adminId of adminIds) {
     const message = await sendTelegramMessage(adminId, lines.filter(Boolean).join('\n'), {
       reply_markup: {
-        inline_keyboard: isMeetup ? [[
-          { text: 'Approvato', callback_data: `cc:processing:${order.id}` },
-          { text: 'Cancellato', callback_data: `cc:cancelled:${order.id}` },
-        ]] : [
+        inline_keyboard: isMeetup ? [
+          [{ text: 'Acconto pagato', callback_data: `cc:paid:${order.id}` }],
+          [
+            { text: 'Approvato', callback_data: `cc:processing:${order.id}` },
+            { text: 'Cancellato', callback_data: `cc:cancelled:${order.id}` },
+          ],
+        ] : [
           [
             { text: 'Pagato', callback_data: `cc:paid:${order.id}` },
             { text: 'In lavoro', callback_data: `cc:processing:${order.id}` },
@@ -797,9 +821,10 @@ async function updateCryptoPayment(order, payment) {
 
   const paidEur = received * Number(order.cryptoRateEur || 0)
   order.cryptoPaidAmount = cryptoAmountForOrder(received, order)
-  order.cryptoPaidEur = Number(Math.min(Number(order.total || 0), paidEur).toFixed(2))
+  const paymentDueEur = Number(order.paymentDueEur ?? order.total ?? 0)
+  order.cryptoPaidEur = Number(Math.min(paymentDueEur, paidEur).toFixed(2))
   order.cryptoRemainingAmount = cryptoAmountForOrder(Math.max(0, expected - received), order)
-  order.cryptoRemainingEur = fullyPaid ? 0 : Number(Math.max(0, Number(order.total || 0) - paidEur).toFixed(2))
+  order.cryptoRemainingEur = fullyPaid ? 0 : Number(Math.max(0, paymentDueEur - paidEur).toFixed(2))
   order.cryptoTxHash = payment.txHash || ''
   order.updatedAt = new Date().toISOString()
 
@@ -807,11 +832,14 @@ async function updateCryptoPayment(order, payment) {
     order.paymentStatus = 'partially_paid'
     await notifyCustomerOrderUpdate(order, 'payment_partial')
     for (const adminId of adminIds) {
+      const amounts = cryptoPaymentAmounts(order)
       await sendTelegramMessage(adminId, [
         '<b>Pagamento crypto parziale rilevato</b>',
         `<b>Ordine:</b> ${escapeHtml(order.id)}`,
         `<b>Ricevuto:</b> ${escapeHtml(order.cryptoPaidAmount)} ${escapeHtml(order.cryptoCurrency)}`,
+        `<b>Gia pagato:</b> €${amounts.paid}`,
         `<b>Da integrare:</b> €${escapeHtml(order.cryptoRemainingEur)} · ${escapeHtml(order.cryptoRemainingAmount)} ${escapeHtml(order.cryptoCurrency)}`,
+        `<b>Saldo ordine restante:</b> €${amounts.orderRemaining}`,
       ].join('\n'))
     }
     return true
@@ -823,10 +851,13 @@ async function updateCryptoPayment(order, payment) {
   await notifyCustomerOrderUpdate(order, 'payment_confirmed')
 
   for (const adminId of adminIds) {
+    const amounts = cryptoPaymentAmounts(order)
     await sendTelegramMessage(adminId, [
       `<b>Pagamento crypto confermato automaticamente</b>`,
       `<b>Ordine:</b> ${escapeHtml(order.id)}`,
       `<b>Importo:</b> ${escapeHtml(order.cryptoPaidAmount)} ${escapeHtml(order.cryptoCurrency)}`,
+      `<b>Gia pagato:</b> €${amounts.paid}`,
+      order.delivery === 'meetup' ? `<b>Saldo ordine restante:</b> €${amounts.orderRemaining}` : '',
       order.cryptoTxHash ? `<b>TX:</b> <code>${escapeHtml(order.cryptoTxHash)}</code>` : '',
     ].filter(Boolean).join('\n'))
   }
@@ -892,10 +923,16 @@ async function applyAdminOrderAction(orderId, action) {
   const orders = await readJson(ordersFile, [])
   const order = orders.find(item => item.id === orderId)
   if (!order) return null
-  if (order.delivery === 'meetup' && !['processing', 'cancelled'].includes(action)) return null
+  if (order.delivery === 'meetup' && !['paid', 'processing', 'cancelled'].includes(action)) return null
 
   if (action === 'paid') {
     order.paymentStatus = 'paid_confirmed'
+    if (order.payment === 'crypto') {
+      order.cryptoPaidAmount = order.cryptoExpectedAmount || order.cryptoPaidAmount || ''
+      order.cryptoPaidEur = Number(order.paymentDueEur ?? order.total ?? 0)
+      order.cryptoRemainingAmount = cryptoAmountForOrder(0, order)
+      order.cryptoRemainingEur = 0
+    }
     if (order.status === 'new') order.status = 'processing'
   } else if (['new', 'processing', 'shipped', 'completed', 'cancelled'].includes(action)) {
     order.status = action
@@ -936,8 +973,8 @@ app.post('/api/orders', async (req, res) => {
   if (!customer?.id) return res.status(401).json({ error: 'Accesso Telegram richiesto per ordinare' })
   if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'Cart is empty' })
   if (!['ship', 'meetup'].includes(delivery)) return res.status(400).json({ error: 'Invalid delivery method' })
-  const payment = delivery === 'meetup' ? 'meetup' : requestedPayment
-  if (!['crypto', 'ccpp', 'meetup'].includes(payment)) return res.status(400).json({ error: 'Invalid payment method' })
+  const payment = delivery === 'meetup' ? 'crypto' : requestedPayment
+  if (!['crypto', 'ccpp'].includes(payment)) return res.status(400).json({ error: 'Invalid payment method' })
 
   const cleanAddress = address && typeof address === 'object' ? address : {}
   if (delivery === 'ship' && (!String(cleanAddress.via || '').trim() || !String(cleanAddress.city || '').trim() || !String(cleanAddress.cap || '').trim())) {
@@ -946,14 +983,17 @@ app.post('/api/orders', async (req, res) => {
 
   const subtotal = items.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0)
   const fees = payment === 'ccpp' ? ccppFee : 0
+  const total = subtotal + fees
+  const paymentDueEur = delivery === 'meetup' ? Number((total * meetupDepositRate).toFixed(2)) : total
+  const paymentDescription = delivery === 'meetup' ? 'Acconto Meetup 25%' : 'Pagamento ordine'
   const cryptoCurrency = String(req.body.cryptoCurrency || 'BTC')
   const cryptoPayment = payment === 'crypto' ? cryptoWallets[cryptoCurrency] || cryptoWallets.BTC : null
   const rates = cryptoPayment ? await getCryptoRatesEur() : null
-  const cryptoExpectedAmount = cryptoPayment ? cryptoAmountForEur(subtotal + fees, cryptoCurrency, rates[cryptoCurrency]) : ''
+  const cryptoExpectedAmount = cryptoPayment ? cryptoAmountForEur(paymentDueEur, cryptoCurrency, rates[cryptoCurrency]) : ''
   if (cryptoPayment) {
     const orders = await readJson(ordersFile, [])
     if (publicCryptoWallets(orders).find(wallet => wallet.id === cryptoCurrency)?.busy) {
-      return res.status(409).json({ error: 'Wallet temporaneamente occupato. Scegli un altra valuta o CCPP.' })
+      return res.status(409).json({ error: delivery === 'meetup' ? 'Wallet temporaneamente occupato. Scegli un altra valuta.' : 'Wallet temporaneamente occupato. Scegli un altra valuta o CCPP.' })
     }
   }
   const requestedCourier = String(req.body.courier || 'UPS').trim()
@@ -966,7 +1006,9 @@ app.post('/api/orders', async (req, res) => {
     delivery,
     courier,
     payment,
-    paymentStatus: payment === 'crypto' ? 'awaiting_crypto' : payment === 'meetup' ? 'meetup_requested' : 'pending',
+    paymentStatus: payment === 'crypto' ? 'awaiting_crypto' : 'pending',
+    paymentDueEur,
+    paymentDescription,
     cryptoCurrency: cryptoPayment?.label || '',
     cryptoNetwork: cryptoPayment?.network || '',
     cryptoWallet: cryptoPayment?.address || '',
@@ -978,7 +1020,7 @@ app.post('/api/orders', async (req, res) => {
     cryptoPaidAmount: '',
     cryptoPaidEur: 0,
     cryptoRemainingAmount: cryptoExpectedAmount,
-    cryptoRemainingEur: cryptoPayment ? subtotal + fees : 0,
+    cryptoRemainingEur: cryptoPayment ? paymentDueEur : 0,
     customer,
     notificationsEnabled: req.body.notificationsEnabled !== false,
     trackingNumber: '',
@@ -995,7 +1037,7 @@ app.post('/api/orders', async (req, res) => {
     })),
     subtotal,
     fees,
-    total: subtotal + fees,
+    total,
   }
 
   const orders = await readJson(ordersFile, [])
@@ -1020,6 +1062,8 @@ app.get('/api/orders/:id/public', async (req, res) => {
     status: order.status,
     payment: order.payment,
     total: order.total,
+    paymentDueEur: order.paymentDueEur ?? order.total,
+    paymentDescription: order.paymentDescription || 'Pagamento ordine',
     paymentStatus: order.paymentStatus,
     trackingNumber: order.trackingNumber || '',
     trackingProvider: order.trackingProvider || '',

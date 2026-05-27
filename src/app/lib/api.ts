@@ -22,6 +22,8 @@ export interface Order {
   cryptoWallet?: string
   cryptoExpectedAmount?: string
   cryptoExpectedUnit?: string
+  paymentDueEur?: number
+  paymentDescription?: string
   cryptoPaymentUri?: string
   cryptoTxHash?: string
   cryptoRateEur?: number

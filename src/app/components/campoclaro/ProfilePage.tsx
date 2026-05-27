@@ -180,6 +180,12 @@ function OrderCard({ order, onOpenPayment }: { order: Order; onOpenPayment: (ord
                     </span>
                   </div>
                 ))}
+                {order.delivery === 'meetup' && order.paymentDueEur != null && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 10, marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.5)' }}>Acconto Meetup 25%</span>
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.82rem', color: '#D6B25E' }}>€{order.paymentDueEur}</span>
+                  </div>
+                )}
               </div>
               {order.delivery !== 'meetup' && <OrderTimeline order={order} />}
               {paymentPending && (

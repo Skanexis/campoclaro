@@ -88,9 +88,10 @@ export function CryptoPaymentModal({
     if (!current) return null
     const expected = Number(current.cryptoExpectedAmount || 0)
     const paid = Number(current.cryptoPaidAmount || 0)
+    const paymentDueEur = Number(current.paymentDueEur ?? current.total)
     const remaining = current.cryptoRemainingAmount || Math.max(0, expected - paid).toFixed(current.cryptoCurrency === 'BTC' ? 8 : current.cryptoCurrency === 'ETH' ? 6 : 2)
-    const paidEur = current.cryptoPaidEur ?? Math.min(current.total, paid * Number(current.cryptoRateEur || 0))
-    const remainingEur = current.cryptoRemainingEur ?? Math.max(0, current.total - paidEur)
+    const paidEur = current.cryptoPaidEur ?? Math.min(paymentDueEur, paid * Number(current.cryptoRateEur || 0))
+    const remainingEur = current.cryptoRemainingEur ?? Math.max(0, paymentDueEur - paidEur)
     const complete = current.paymentStatus === 'paid_confirmed' || remainingEur <= 0
     const currency = current.cryptoCurrency || current.cryptoExpectedUnit || ''
     const qrValue = complete
@@ -98,7 +99,7 @@ export function CryptoPaymentModal({
       : currency === 'BTC'
       ? `bitcoin:${current.cryptoWallet}?amount=${remaining}`
       : current.cryptoPaymentUri || current.cryptoWallet || ''
-    return { expected, paid, remaining, paidEur, remainingEur, complete, currency, qrValue }
+    return { expected, paid, paymentDueEur, remaining, paidEur, remainingEur, complete, currency, qrValue }
   }, [current])
 
   const copy = (value: string) => {
@@ -190,7 +191,7 @@ export function CryptoPaymentModal({
                 </div>
                 <div style={{ padding: '13px 14px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)', borderRadius: 8, marginBottom: 10 }}>
                   <div style={{ fontSize: '0.67rem', color: 'rgba(245,245,245,0.38)', textTransform: 'uppercase', letterSpacing: '0.13em', marginBottom: 6 }}>Totale ordine</div>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '1.05rem', fontWeight: 700 }}>{euro(current.total)} <span style={{ color: '#D6B25E' }}>· {current.cryptoExpectedAmount} {details.currency}</span></div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '1.05rem', fontWeight: 700 }}>{euro(current.total)}</div>
                 </div>
                 {details.paid > 0 && (
                   <div style={{ padding: '13px 14px', border: '1px solid rgba(110,207,149,0.18)', background: 'rgba(110,207,149,0.06)', borderRadius: 8, marginBottom: 10 }}>
@@ -200,7 +201,7 @@ export function CryptoPaymentModal({
                 )}
                 {!details.complete && (
                   <div style={{ padding: '13px 14px', border: '1px solid rgba(214,178,94,0.26)', background: 'rgba(214,178,94,0.08)', borderRadius: 8, marginBottom: 15 }}>
-                    <div style={{ fontSize: '0.67rem', color: '#D6B25E', textTransform: 'uppercase', letterSpacing: '0.13em', marginBottom: 6 }}>{details.paid > 0 ? 'Da integrare' : 'Da inviare'}</div>
+                    <div style={{ fontSize: '0.67rem', color: '#D6B25E', textTransform: 'uppercase', letterSpacing: '0.13em', marginBottom: 6 }}>{details.paid > 0 ? 'Da integrare' : (current.paymentDescription || 'Da inviare')}</div>
                     <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '1.02rem', fontWeight: 700 }}>{euro(details.remainingEur)} · {details.remaining} {details.currency}</div>
                   </div>
                 )}
