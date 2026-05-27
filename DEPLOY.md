@@ -295,9 +295,12 @@ overwrite the persistent catalog on an existing server.
 ### Product media uploads
 
 The product editor accepts up to 5 images and 8 videos per product. Images are
-limited to 15 MB each and videos to 250 MB each. On an existing VPS, add this
-line inside the active Nginx `server {}` block for `campoclaro.eu`, including
-the HTTPS block created by Certbot:
+limited to 15 MB each and videos to 250 MB each. Video uploads are split into
+small requests by the application, so they continue to work even if a proxy
+rejects one large request. Keep a larger Nginx limit as well for image uploads
+and compatibility with older clients. On an existing VPS, add this line inside
+the active Nginx `server {}` block for `campoclaro.eu`, including the HTTPS
+block created by Certbot:
 
 ```nginx
 client_max_body_size 260m;

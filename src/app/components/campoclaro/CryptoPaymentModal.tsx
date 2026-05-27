@@ -33,10 +33,13 @@ export function CryptoPaymentModal({
   const [reporting, setReporting] = useState(false)
   const [message, setMessage] = useState('')
   const onUpdateRef = useRef(onUpdate)
+  const onCloseRef = useRef(onClose)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     onUpdateRef.current = onUpdate
-  }, [onUpdate])
+    onCloseRef.current = onClose
+  }, [onClose, onUpdate])
 
   useEffect(() => {
     setCurrent(order)
@@ -51,6 +54,21 @@ export function CryptoPaymentModal({
     const interval = window.setInterval(update, 1000)
     return () => window.clearInterval(interval)
   }, [open, current?.createdAt])
+
+  useEffect(() => {
+    if (!open) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    closeButtonRef.current?.focus()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCloseRef.current()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open || !order?.id) return
@@ -75,7 +93,9 @@ export function CryptoPaymentModal({
     const remainingEur = current.cryptoRemainingEur ?? Math.max(0, current.total - paidEur)
     const complete = current.paymentStatus === 'paid_confirmed' || remainingEur <= 0
     const currency = current.cryptoCurrency || current.cryptoExpectedUnit || ''
-    const qrValue = currency === 'BTC' && !complete
+    const qrValue = complete
+      ? ''
+      : currency === 'BTC'
       ? `bitcoin:${current.cryptoWallet}?amount=${remaining}`
       : current.cryptoPaymentUri || current.cryptoWallet || ''
     return { expected, paid, remaining, paidEur, remainingEur, complete, currency, qrValue }
@@ -113,43 +133,54 @@ export function CryptoPaymentModal({
             onClick={onClose}
             style={{ position: 'fixed', inset: 0, zIndex: 380, background: 'rgba(0,0,0,0.76)', backdropFilter: 'blur(7px)' }}
           />
-          <motion.section
-            role="dialog"
-            aria-modal="true"
-            aria-label="Pagamento crypto"
-            initial={{ opacity: 0, y: 24, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 18, scale: 0.98 }}
-            className="crypto-payment-modal"
+          <div
+            className="crypto-payment-positioner"
             style={{
               position: 'fixed',
               zIndex: 381,
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: 'min(760px, calc(100vw - 24px))',
-              maxHeight: 'calc(100vh - 24px)',
-              overflowY: 'auto',
-              borderRadius: 14,
-              border: '1px solid rgba(214,178,94,0.22)',
-              background: '#0B0B0D',
-              color: '#F5F5F5',
-              padding: 22,
+              inset: 0,
+              padding: 12,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
               boxSizing: 'border-box',
             }}
           >
+            <motion.section
+              role="dialog"
+              aria-modal="true"
+              aria-label="Pagamento crypto"
+              initial={{ opacity: 0, y: 24, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.98 }}
+              className="crypto-payment-modal"
+              style={{
+                width: 'min(760px, 100%)',
+                maxHeight: 'calc(100dvh - 24px)',
+                overflowY: 'auto',
+                borderRadius: 14,
+                border: '1px solid rgba(214,178,94,0.22)',
+                background: '#0B0B0D',
+                color: '#F5F5F5',
+                padding: 22,
+                pointerEvents: 'auto',
+                boxSizing: 'border-box',
+                boxShadow: '0 28px 90px rgba(0,0,0,0.58)',
+              }}
+            >
             <header style={{ display: 'flex', justifyContent: 'space-between', gap: 14, marginBottom: 20 }}>
               <div>
                 <div style={{ fontFamily: "'Inter', sans-serif", color: '#D6B25E', fontSize: '0.67rem', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 7 }}>Pagamento Crypto</div>
                 <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: '1.3rem', fontWeight: 700 }}>{details.complete ? 'Pagamento confermato' : details.paid > 0 ? 'Completa il pagamento' : 'Invia il pagamento'}</div>
                 <div style={{ marginTop: 6, fontFamily: "'JetBrains Mono', monospace", color: 'rgba(245,245,245,0.4)', fontSize: '0.72rem' }}>{current.id}</div>
               </div>
-              <button type="button" onClick={onClose} style={{ border: 0, background: 'transparent', color: 'rgba(245,245,245,0.5)', cursor: 'pointer', height: 32 }}><X size={19} /></button>
+              <button ref={closeButtonRef} type="button" aria-label="Chiudi pagamento" onClick={onClose} style={{ border: 0, background: 'transparent', color: 'rgba(245,245,245,0.5)', cursor: 'pointer', height: 32 }}><X size={19} /></button>
             </header>
 
             <div className="crypto-payment-grid" style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20 }}>
               <div style={{ padding: 14, background: '#fff', borderRadius: 10, alignSelf: 'start', textAlign: 'center' }}>
-                {details.qrValue && <QRCodeSVG value={details.qrValue} size={190} level="M" style={{ display: 'block', maxWidth: '100%', height: 'auto' }} />}
+                {details.qrValue ? <QRCodeSVG value={details.qrValue} size={190} level="M" style={{ display: 'block', maxWidth: '100%', height: 'auto' }} /> : <Check size={82} color="#198754" style={{ display: 'block', margin: '44px auto' }} />}
                 <div style={{ color: '#151515', fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: '0.66rem', marginTop: 10 }}>{details.currency} · {current.cryptoNetwork}</div>
               </div>
 
@@ -197,14 +228,24 @@ export function CryptoPaymentModal({
             {message && <div style={{ marginTop: 10, color: '#D6B25E', fontFamily: "'Inter', sans-serif", fontSize: '0.75rem' }}>{message}</div>}
             <style>{`
               @media (max-width: 620px) {
-                .crypto-payment-modal { padding: 16px !important; }
+                .crypto-payment-positioner {
+                  align-items: flex-end !important;
+                  padding: 0 !important;
+                }
+                .crypto-payment-modal {
+                  padding: 16px 14px calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+                  width: 100% !important;
+                  max-height: calc(100dvh - 52px) !important;
+                  border-radius: 18px 18px 0 0 !important;
+                }
                 .crypto-payment-grid { grid-template-columns: 1fr !important; }
-                .crypto-payment-grid > div:first-child { margin: 0 auto; }
+                .crypto-payment-grid > div:first-child { margin: 0 auto; width: min(220px, 100%); box-sizing: border-box; }
                 .crypto-tx-row { flex-direction: column; }
                 .crypto-tx-row button { height: 44px; }
               }
             `}</style>
-          </motion.section>
+            </motion.section>
+          </div>
         </>
       )}
     </AnimatePresence>

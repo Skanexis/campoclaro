@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { motion, AnimatePresence } from 'motion/react'
-import { X, Plus, Minus, Trash2, Truck, MapPin, ChevronRight, Check, ArrowLeft } from 'lucide-react'
+import { X, Plus, Minus, Trash2, Truck, MapPin, ChevronRight, Check, ArrowLeft, Copy } from 'lucide-react'
 import { useCart } from '../../context/CartContext'
 import { api, type Order } from '../../lib/api'
 import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
@@ -119,6 +119,7 @@ function DeliveryCard({
 
   return (
     <motion.button
+      type="button"
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={onSelect}
@@ -161,6 +162,7 @@ function PaymentCard({
 }) {
   return (
     <motion.button
+      type="button"
       whileHover={{ scale: 1.01, boxShadow: selected ? '0 4px 20px rgba(214,178,94,0.15)' : 'none' }}
       whileTap={{ scale: 0.99 }}
       onClick={onSelect}
@@ -219,12 +221,17 @@ export function CartDrawer() {
   const [lastOrder, setLastOrder] = useState<Order | null>(null)
   const [cryptoModalOpen, setCryptoModalOpen] = useState(false)
   const [walletAvailability, setWalletAvailability] = useState<Record<string, { busy: boolean; address: string; network: string; label: string }>>({})
+  const [walletError, setWalletError] = useState('')
 
   const [address, setAddress] = useState({ via: '', city: '', cap: '', notes: '' })
   const itemKey = (item: { id: string; weight: string; strain?: string }) => `${item.id}-${item.weight}-${item.strain || 'default'}`
   const ccppFee = delivery === 'ship' && payMethod === 'ccpp' ? CCPP_FEE : 0
   const orderTotal = total + ccppFee
-  const selectedCrypto = CRYPTO_WALLETS[cryptoCurrency]
+  const selectedCrypto = {
+    ...CRYPTO_WALLETS[cryptoCurrency],
+    ...walletAvailability[cryptoCurrency],
+    address: walletAvailability[cryptoCurrency]?.address || '',
+  }
   const selectedWalletBusy = walletAvailability[cryptoCurrency]?.busy === true
 
   useEffect(() => {
@@ -235,6 +242,7 @@ export function CartDrawer() {
 
   useEffect(() => {
     if (!isOpen) return
+    setWalletError('')
     api.cryptoWallets()
       .then(wallets => {
         const next = Object.fromEntries(wallets.map(wallet => [wallet.id, wallet]))
@@ -246,8 +254,20 @@ export function CartDrawer() {
           else setPayMethod('ccpp')
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        setWalletError('Wallet crypto non disponibili in questo momento. Usa CCPP o riprova.')
+        setPayMethod('ccpp')
+      })
   }, [isOpen, cryptoCurrency])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (!lastOrder?.id || step !== 'success') return
@@ -274,6 +294,10 @@ export function CartDrawer() {
       setOrderError('Wallet occupato. Scegli una valuta disponibile o CCPP.')
       return
     }
+    if (delivery === 'ship' && payMethod === 'crypto' && !selectedCrypto.address) {
+      setOrderError('Wallet crypto non disponibile. Riprova o scegli CCPP.')
+      return
+    }
     setStep(delivery === 'meetup' ? 'confirm' : 'payment')
   }
   const handleConfirm = () => setStep('confirm')
@@ -283,9 +307,14 @@ export function CartDrawer() {
       setOrderError('Wallet occupato. Scegli una valuta disponibile o CCPP.')
       return
     }
+    if (delivery === 'ship' && payMethod === 'crypto' && !selectedCrypto.address) {
+      setOrderError('Wallet crypto non disponibile. Riprova o scegli CCPP.')
+      return
+    }
     setStep('confirm')
   }
   const handlePlaceOrder = async () => {
+    if (submitting) return
     setSubmitting(true)
     setOrderError('')
     try {
@@ -312,6 +341,11 @@ export function CartDrawer() {
   const handleClose = () => {
     closeCart()
     setTimeout(() => setStep('cart'), 300)
+  }
+
+  const copyCryptoAddress = () => {
+    if (!selectedCrypto.address) return
+    navigator.clipboard?.writeText(selectedCrypto.address).catch(() => {})
   }
 
   return (
@@ -696,7 +730,7 @@ export function CartDrawer() {
                         <div className="cc-cart-crypto-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
                           {(Object.keys(CRYPTO_WALLETS) as CryptoCurrency[]).map(currency => {
                             const selected = cryptoCurrency === currency
-                            const wallet = CRYPTO_WALLETS[currency]
+                            const wallet = walletAvailability[currency] || CRYPTO_WALLETS[currency]
                             const busy = walletAvailability[currency]?.busy === true
                             return (
                               <button
@@ -731,6 +765,7 @@ export function CartDrawer() {
                           <button
                             type="button"
                             onClick={copyCryptoAddress}
+                            disabled={!selectedCrypto.address}
                             style={{
                               width: '100%',
                               display: 'flex',
@@ -742,17 +777,22 @@ export function CartDrawer() {
                               border: '1px solid rgba(255,255,255,0.06)',
                               borderRadius: 6,
                               color: '#F5F5F5',
-                              cursor: 'pointer',
+                              cursor: selectedCrypto.address ? 'pointer' : 'wait',
                               fontFamily: "'JetBrains Mono', monospace",
                               fontSize: '0.72rem',
                               wordBreak: 'break-all',
                               textAlign: 'left',
                             }}
                           >
-                            <span>{selectedCrypto.address}</span>
+                            <span>{selectedCrypto.address || 'Caricamento wallet sicuro...'}</span>
                             <Copy size={14} style={{ flexShrink: 0, color: '#D6B25E' }} />
                           </button>
                         </div>
+                        {walletError && (
+                          <div style={{ marginTop: 10, fontFamily: "'Inter', sans-serif", fontSize: '0.75rem', color: '#E57373', lineHeight: 1.45 }}>
+                            {walletError}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -837,7 +877,7 @@ export function CartDrawer() {
                             Wallet
                           </div>
                           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.72rem', color: 'rgba(245,245,245,0.68)', wordBreak: 'break-all' }}>
-                            {selectedCrypto.address}
+                            {selectedCrypto.address || 'Wallet non disponibile'}
                           </div>
                         </div>
                       )}
@@ -961,6 +1001,7 @@ export function CartDrawer() {
                   whileHover={{ scale: 1.02, boxShadow: '0 6px 24px rgba(214,178,94,0.2)' }}
                   whileTap={{ scale: 0.98 }}
                   onClick={step === 'cart' ? handleCheckout : step === 'payment' ? handlePaymentConfirm : handlePlaceOrder}
+                  disabled={submitting}
                   style={{
                     width: '100%',
                     padding: '14px',
@@ -973,7 +1014,8 @@ export function CartDrawer() {
                     fontWeight: 600,
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',
-                    cursor: 'pointer',
+                    cursor: submitting ? 'wait' : 'pointer',
+                    opacity: submitting ? 0.72 : 1,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

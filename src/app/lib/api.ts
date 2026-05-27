@@ -99,9 +99,40 @@ async function uploadMedia(url: string, file: File): Promise<{ url: string }> {
   const res = await fetch(url, { method: 'POST', body, credentials: 'include' })
   if (!res.ok) {
     const response = await res.json().catch(() => ({}))
+    if (res.status === 413) {
+      throw new Error(response.error || 'File troppo grande per il server. Il limite video e di 250 MB; se il file rientra nel limite, aggiorna la configurazione Nginx del server.')
+    }
     throw new Error(response.error || `Upload failed: ${res.status}`)
   }
   return res.json()
+}
+
+async function uploadProductVideoInChunks(file: File): Promise<{ url: string }> {
+  const session = await request<{ uploadId: string; chunkSize: number }>('/api/admin/media/videos/chunks', {
+    method: 'POST',
+    body: JSON.stringify({ name: file.name, size: file.size, type: file.type }),
+  })
+  let chunkIndex = 0
+  for (let start = 0; start < file.size; start += session.chunkSize) {
+    const response = await fetch(`/api/admin/media/videos/chunks/${encodeURIComponent(session.uploadId)}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-Chunk-Index': String(chunkIndex),
+      },
+      body: file.slice(start, Math.min(file.size, start + session.chunkSize)),
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}))
+      throw new Error(body.error || `Upload failed: ${response.status}`)
+    }
+    chunkIndex += 1
+  }
+  return request<{ url: string }>(`/api/admin/media/videos/chunks/${encodeURIComponent(session.uploadId)}/complete`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
 }
 
 export const api = {
@@ -136,7 +167,7 @@ export const api = {
       : request<Product>('/api/admin/products', { method: 'POST', body: JSON.stringify(product) }),
   deleteProduct: (id: string) => request(`/api/admin/products/${id}`, { method: 'DELETE' }),
   uploadProductImage: (file: File) => uploadMedia('/api/admin/media/images', file),
-  uploadProductVideo: (file: File) => uploadMedia('/api/admin/media/videos', file),
+  uploadProductVideo: (file: File) => uploadProductVideoInChunks(file),
   deleteProductMedia: (url: string) => request('/api/admin/media', { method: 'DELETE', body: JSON.stringify({ url }) }),
   adminOrders: () => request<Order[]>('/api/admin/orders'),
   updateOrderStatus: (id: string, status: string) =>

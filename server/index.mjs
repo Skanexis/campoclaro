@@ -21,6 +21,11 @@ const ordersFile = path.join(dataDir, 'orders.json')
 const siteContentFile = path.join(dataDir, 'site-content.json')
 const newsletterSubscribersFile = path.join(dataDir, 'newsletter-subscribers.json')
 const mediaDir = path.join(dataDir, 'media')
+const maxImageUploadBytes = 15 * 1024 * 1024
+const maxVideoUploadBytes = 250 * 1024 * 1024
+const videoUploadChunkBytes = 768 * 1024
+const videoUploadTtlMs = 60 * 60 * 1000
+const pendingVideoUploads = new Map()
 
 const defaultSiteContent = {
   welcomeTitle: 'BENVENUTI SU CAMPOCLARO',
@@ -374,6 +379,12 @@ async function writeJson(file, data) {
 async function initializeDataDir() {
   await fs.mkdir(dataDir, { recursive: true })
   await fs.mkdir(mediaDir, { recursive: true })
+  const mediaFiles = await fs.readdir(mediaDir)
+  await Promise.all(
+    mediaFiles
+      .filter(fileName => fileName.startsWith('.upload-') && fileName.endsWith('.part'))
+      .map(fileName => fs.rm(path.join(mediaDir, fileName), { force: true })),
+  )
   for (const fileName of ['products.json', 'orders.json', 'site-content.json']) {
     const target = path.join(dataDir, fileName)
     try {
@@ -421,15 +432,29 @@ const allowedVideoTypes = new Set(['video/mp4', 'video/webm', 'video/quicktime']
 
 const imageUpload = multer({
   storage: mediaStorage,
-  limits: { fileSize: 15 * 1024 * 1024 },
+  limits: { fileSize: maxImageUploadBytes },
   fileFilter: (_req, file, callback) => callback(null, allowedImageTypes.has(file.mimetype)),
 })
 
 const videoUpload = multer({
   storage: mediaStorage,
-  limits: { fileSize: 250 * 1024 * 1024 },
+  limits: { fileSize: maxVideoUploadBytes },
   fileFilter: (_req, file, callback) => callback(null, allowedVideoTypes.has(file.mimetype)),
 })
+
+async function removeExpiredVideoUploads() {
+  const now = Date.now()
+  for (const [uploadId, upload] of pendingVideoUploads) {
+    if (upload.expiresAt > now) continue
+    pendingVideoUploads.delete(uploadId)
+    await fs.rm(upload.temporaryPath, { force: true }).catch(() => undefined)
+  }
+}
+
+function videoMediaFilename(originalName) {
+  const extension = path.extname(String(originalName || '')).toLowerCase().replace(/[^a-z0-9.]/g, '').slice(0, 8)
+  return `${Date.now()}-${nanoid(10)}${extension}`
+}
 
 function signSession(payload) {
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
@@ -1122,6 +1147,71 @@ app.post('/api/admin/media/videos', requireAdmin, videoUpload.single('file'), (r
   res.status(201).json({ url: `/media/${req.file.filename}` })
 })
 
+app.post('/api/admin/media/videos/chunks', requireAdmin, async (req, res, next) => {
+  try {
+    await removeExpiredVideoUploads()
+    const size = Number(req.body.size || 0)
+    const type = String(req.body.type || '')
+    if (!allowedVideoTypes.has(type)) return res.status(400).json({ error: 'Carica un file MP4, WEBM o MOV.' })
+    if (!Number.isInteger(size) || size <= 0) return res.status(400).json({ error: 'Dimensione video non valida.' })
+    if (size > maxVideoUploadBytes) return res.status(413).json({ error: 'Video troppo grande: massimo 250 MB per file.' })
+
+    const uploadId = nanoid(24)
+    const filename = videoMediaFilename(req.body.name)
+    const temporaryPath = path.join(mediaDir, `.upload-${uploadId}.part`)
+    await fs.writeFile(temporaryPath, Buffer.alloc(0))
+    pendingVideoUploads.set(uploadId, {
+      expiresAt: Date.now() + videoUploadTtlMs,
+      filename,
+      nextChunk: 0,
+      received: 0,
+      size,
+      temporaryPath,
+    })
+    res.status(201).json({ uploadId, chunkSize: videoUploadChunkBytes })
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.put(
+  '/api/admin/media/videos/chunks/:uploadId',
+  requireAdmin,
+  express.raw({ type: 'application/octet-stream', limit: videoUploadChunkBytes + 1024 }),
+  async (req, res, next) => {
+    try {
+      const upload = pendingVideoUploads.get(req.params.uploadId)
+      if (!upload || upload.expiresAt <= Date.now()) return res.status(404).json({ error: 'Caricamento video scaduto. Riprova.' })
+      const chunkIndex = Number(req.get('X-Chunk-Index'))
+      if (chunkIndex !== upload.nextChunk) return res.status(409).json({ error: 'Ordine dei blocchi video non valido. Riprova.' })
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0 || upload.received + req.body.length > upload.size) {
+        return res.status(400).json({ error: 'Blocco video non valido.' })
+      }
+      await fs.appendFile(upload.temporaryPath, req.body)
+      upload.received += req.body.length
+      upload.nextChunk += 1
+      upload.expiresAt = Date.now() + videoUploadTtlMs
+      res.json({ received: upload.received, total: upload.size })
+    } catch (error) {
+      next(error)
+    }
+  },
+)
+
+app.post('/api/admin/media/videos/chunks/:uploadId/complete', requireAdmin, async (req, res, next) => {
+  try {
+    const upload = pendingVideoUploads.get(req.params.uploadId)
+    if (!upload) return res.status(404).json({ error: 'Caricamento video non trovato. Riprova.' })
+    if (upload.received !== upload.size) return res.status(409).json({ error: 'Caricamento video incompleto.' })
+    const completedPath = path.join(mediaDir, upload.filename)
+    await fs.rename(upload.temporaryPath, completedPath)
+    pendingVideoUploads.delete(req.params.uploadId)
+    res.status(201).json({ url: `/media/${upload.filename}` })
+  } catch (error) {
+    next(error)
+  }
+})
+
 app.delete('/api/admin/media', requireAdmin, async (req, res) => {
   const url = String(req.body.url || '')
   if (!url.startsWith('/media/')) return res.json({ ok: true })
@@ -1331,7 +1421,10 @@ app.post('/api/telegram/webhook', async (req, res) => {
 
 app.use((error, _req, res, next) => {
   if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
-    return res.status(400).json({ error: 'File troppo grande per il caricamento.' })
+    return res.status(413).json({ error: 'File troppo grande: massimo 15 MB per foto e 250 MB per video.' })
+  }
+  if (error?.status === 413 || error?.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Blocco upload troppo grande. Riprova il caricamento.' })
   }
   return next(error)
 })

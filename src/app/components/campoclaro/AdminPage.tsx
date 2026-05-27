@@ -9,6 +9,14 @@ import { TelegramStartLogin } from './TelegramStartLogin'
 
 type AdminTab = 'orders' | 'products' | 'filters' | 'contacts' | 'newsletter'
 type ProductMediaKey = 'images' | 'videos'
+const MEDIA_MAX_BYTES: Record<ProductMediaKey, number> = {
+  images: 15 * 1024 * 1024,
+  videos: 250 * 1024 * 1024,
+}
+const MEDIA_MAX_LABEL: Record<ProductMediaKey, string> = {
+  images: '15 MB',
+  videos: '250 MB',
+}
 
 const EMPTY_PRODUCT: Product & { active?: boolean; originalId?: string } = {
   id: '',
@@ -380,6 +388,9 @@ export function AdminPage() {
     setMediaUploading(key)
     try {
       for (const file of Array.from(files).slice(0, available)) {
+        if (file.size > MEDIA_MAX_BYTES[key]) {
+          throw new Error(`${key === 'images' ? 'Foto' : 'Video'} troppo grande: massimo ${MEDIA_MAX_LABEL[key]} per file.`)
+        }
         const result = key === 'images' ? await api.uploadProductImage(file) : await api.uploadProductVideo(file)
         setEditing(prev => ({ ...prev, [key]: [...(prev[key] || []), result.url].slice(0, limit) }))
       }
@@ -769,6 +780,9 @@ export function AdminPage() {
                           style={{ display: 'none' }}
                         />
                       </label>
+                    </div>
+                    <div style={{ marginBottom: 10, fontFamily: "'Inter', sans-serif", fontSize: '0.68rem', color: 'rgba(245,245,245,0.36)' }}>
+                      Massimo {MEDIA_MAX_LABEL[media.key]} per file
                     </div>
                     {(editing[media.key]?.length || 0) === 0 ? (
                       <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.74rem', color: 'rgba(245,245,245,0.3)' }}>Nessun file caricato.</div>
