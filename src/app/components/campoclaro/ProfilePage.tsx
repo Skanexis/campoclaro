@@ -1,13 +1,15 @@
 import { type ReactElement, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { motion, AnimatePresence } from 'motion/react'
-import { User, Package, Settings, ChevronRight, Clock, Check, Truck, Shield, LogOut } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
+import { User, Package, Settings, ChevronRight, Clock, Check, Truck, Shield, LogOut, Fingerprint, Copy, LockKeyhole, Crown, Sparkles } from 'lucide-react'
 import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
 import { api, Order } from '../../lib/api'
 import { CryptoPaymentModal } from './CryptoPaymentModal'
 import { TelegramStartLogin } from './TelegramStartLogin'
+import { useSiteContent } from '../../hooks/useSiteContent'
 
-type SidebarSection = 'profile' | 'orders' | 'settings' | 'admin'
+type SidebarSection = 'profile' | 'circle' | 'orders' | 'settings' | 'admin'
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: ReactElement }> = {
   completed: { label: 'Completato', color: '#4CAF7D', icon: <Check size={12} /> },
@@ -83,6 +85,83 @@ function OrderTimeline({ order }: { order: Order }) {
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+function OrderPassport({ order }: { order: Order }) {
+  const passportId = order.passportId || `CP-${order.id.replace(/[^A-Z0-9]/gi, '').slice(-10).toUpperCase()}`
+  const verificationCode = order.verificationCode || order.id.replace(/[^A-Z0-9]/gi, '').slice(-8).toUpperCase()
+  const passportValue = JSON.stringify({
+    passportId,
+    orderId: order.id,
+    status: order.status,
+    total: order.total,
+  })
+  const paymentLabel = order.payment === 'crypto'
+    ? order.paymentStatus === 'paid_confirmed' ? 'Crypto verificato' : 'Crypto in verifica'
+    : 'CCPP'
+
+  const copyPassport = () => {
+    navigator.clipboard?.writeText(`${passportId} / ${verificationCode}`).catch(() => {})
+  }
+
+  return (
+    <div className="profile-passport" style={{
+      marginTop: 16,
+      marginBottom: 16,
+      padding: 14,
+      borderRadius: 9,
+      border: '1px solid rgba(214,178,94,0.18)',
+      background: 'linear-gradient(145deg, rgba(214,178,94,0.075), rgba(255,255,255,0.025) 44%, rgba(5,5,5,0.25))',
+      boxShadow: '0 18px 60px rgba(0,0,0,0.22)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 9 }}>
+            <Fingerprint size={16} color="#D6B25E" />
+            <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.62rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#D6B25E' }}>
+              Campo Passport
+            </span>
+          </div>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.92rem', color: '#F5F5F5', overflowWrap: 'anywhere', marginBottom: 7 }}>
+            {passportId}
+          </div>
+          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+            {[
+              { label: 'Verify', value: verificationCode },
+              { label: 'Payment', value: paymentLabel },
+              { label: 'Delivery', value: order.delivery === 'meetup' ? 'Meetup' : order.courier || 'Ship' },
+            ].map(item => (
+              <div key={item.label} style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.54rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.26)', marginBottom: 3 }}>
+                  {item.label}
+                </div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.68rem', color: item.label === 'Payment' ? '#D6B25E' : 'rgba(245,245,245,0.68)' }}>
+                  {item.value}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ width: 92, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 82, height: 82, padding: 6, borderRadius: 8, background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <QRCodeSVG value={passportValue} size={70} bgColor="#F5F5F5" fgColor="#050505" />
+          </div>
+          <button
+            type="button"
+            onClick={copyPassport}
+            title="Copia Passport"
+            style={{ width: 32, height: 28, borderRadius: 6, border: '1px solid rgba(214,178,94,0.22)', background: 'rgba(214,178,94,0.08)', color: '#D6B25E', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Copy size={13} />
+          </button>
+        </div>
+      </div>
+      <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(245,245,245,0.36)', fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', lineHeight: 1.45 }}>
+        <LockKeyhole size={14} color="#D6B25E" style={{ flexShrink: 0 }} />
+        Stato, pagamento e tracking restano collegati a questo ID nella tua area privata.
+      </div>
     </div>
   )
 }
@@ -169,6 +248,7 @@ function OrderCard({ order, onOpenPayment }: { order: Order; onOpenPayment: (ord
             style={{ overflow: 'hidden' }}
           >
             <div className="profile-order-details" style={{ padding: '0 20px 20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <OrderPassport order={order} />
               <div style={{ paddingTop: 16, marginBottom: 12 }}>
                 {order.items.map((item, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -252,6 +332,7 @@ function ProfileTelegramLogin({ onReady }: { onReady: () => Promise<void> }) {
 
 export function ProfilePage() {
   const [active, setActive] = useState<SidebarSection>('profile')
+  const siteContent = useSiteContent()
   const [user, setUser] = useState<null | { id: string; username?: string; firstName?: string; role?: string }>(null)
   const [customerSignedIn, setCustomerSignedIn] = useState(false)
   const [orders, setOrders] = useState<Order[]>([])
@@ -297,6 +378,26 @@ export function ProfilePage() {
     shipping: orders.filter(order => order.status === 'shipped').length,
   }), [orders])
 
+  const circle = useMemo(() => {
+    const config = siteContent.circle
+    const completed = orders.filter(order => order.status === 'completed').length
+    const paid = orders.filter(order => order.paymentStatus === 'paid_confirmed').length
+    const totalOrders = orders.length
+    const productBoost = orders
+      .filter(order => order.status === 'completed')
+      .reduce((sum, order) => sum + Number(order.circleScoreAward || 0), 0)
+    const score = completed * config.orderCompletedPoints
+      + paid * config.paymentVerifiedPoints
+      + (notificationsEnabled ? config.notificationsPoints : 0)
+      + (totalOrders > 1 ? config.recurringCustomerPoints : 0)
+      + productBoost
+    const levels = [...config.levels].sort((a, b) => a.minScore - b.minScore)
+    const current = [...levels].reverse().find(level => score >= level.minScore) || levels[0]
+    const next = levels.find(level => level.minScore > score) || null
+    const progress = next && current ? Math.min(100, Math.round(((score - current.minScore) / Math.max(1, next.minScore - current.minScore)) * 100)) : 100
+    return { config, score, levels, current, next, progress }
+  }, [orders, notificationsEnabled, siteContent.circle])
+
   const toggleNewsletter = async () => {
     const next = !newsletterEnabled
     setNewsletterMessage('')
@@ -325,6 +426,7 @@ export function ProfilePage() {
 
   const navItems = [
     { id: 'profile' as SidebarSection, label: 'Profilo', icon: <User size={16} /> },
+    { id: 'circle' as SidebarSection, label: 'Circle', icon: <Crown size={16} /> },
     { id: 'orders' as SidebarSection, label: 'Ordini', icon: <Package size={16} /> },
     { id: 'settings' as SidebarSection, label: 'Impostazioni', icon: <Settings size={16} /> },
     ...(isAdmin ? [{ id: 'admin' as SidebarSection, label: 'Admin', icon: <Shield size={16} /> }] : []),
@@ -519,6 +621,98 @@ export function ProfilePage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                </motion.div>
+              )}
+
+              {active === 'circle' && (
+                <motion.div
+                  key="circle"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.25 }}
+                >
+                  <div style={{ padding: 18, background: 'linear-gradient(145deg, rgba(214,178,94,0.08), rgba(255,255,255,0.025))', border: '1px solid rgba(214,178,94,0.16)', borderRadius: 8, marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', marginBottom: 16 }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#D6B25E', marginBottom: 8 }}>
+                          <Crown size={18} />
+                          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.16em', textTransform: 'uppercase' }}>CAMPO Circle</span>
+                        </div>
+                        <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: '1.55rem', fontWeight: 800, color: '#F5F5F5', marginBottom: 5 }}>
+                          {circle.current?.label || 'Guest'}
+                        </div>
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.42)', lineHeight: 1.5 }}>
+                          {circle.current?.description || 'Il tuo livello privato CAMPOCLARO.'}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '1.55rem', fontWeight: 800, color: '#D6B25E' }}>
+                          {customerSignedIn ? circle.score : '-'}
+                        </div>
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.62rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.32)' }}>
+                          Access Score
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.07)', overflow: 'hidden', marginBottom: 9 }}>
+                      <div style={{ width: `${customerSignedIn ? circle.progress : 0}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #D6B25E, #F0C96A)' }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.38)' }}>
+                      <span>{circle.current?.label || 'Guest'}</span>
+                      <span>{circle.next ? `${circle.next.minScore - circle.score} punti a ${circle.next.label}` : 'Livello massimo'}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }} className="profile-account-grid">
+                    {[
+                      { label: 'Ordini completati', value: orders.filter(order => order.status === 'completed').length, detail: `+${siteContent.circle.orderCompletedPoints} cad.` },
+                      { label: 'Pagamenti verificati', value: orders.filter(order => order.paymentStatus === 'paid_confirmed').length, detail: `+${siteContent.circle.paymentVerifiedPoints} cad.` },
+                      { label: 'Notifiche', value: notificationsEnabled ? 'Attive' : 'Off', detail: notificationsEnabled ? `+${siteContent.circle.notificationsPoints}` : '+0' },
+                      { label: 'Ricorrenza', value: orders.length > 1 ? 'Attiva' : 'In attesa', detail: orders.length > 1 ? `+${siteContent.circle.recurringCustomerPoints}` : '+0' },
+                      { label: 'Bonus prodotti', value: orders.reduce((sum, order) => sum + Number(order.circleScoreAward || 0), 0), detail: 'da drop Circle' },
+                    ].map(item => (
+                      <div key={item.label} style={{ padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.28)', marginBottom: 5 }}>
+                          {item.label}
+                        </div>
+                        <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 800, color: '#F5F5F5', marginBottom: 3 }}>
+                          {item.value}
+                        </div>
+                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.68rem', color: '#D6B25E' }}>
+                          {item.detail}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
+                    {circle.levels.map(level => {
+                      const unlocked = circle.score >= level.minScore
+                      return (
+                        <div key={level.id} style={{ padding: 14, borderRadius: 8, background: unlocked ? 'rgba(214,178,94,0.055)' : 'rgba(255,255,255,0.018)', border: unlocked ? '1px solid rgba(214,178,94,0.16)' : '1px solid rgba(255,255,255,0.05)', opacity: customerSignedIn ? 1 : 0.65 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'Satoshi', sans-serif", fontWeight: 800, color: unlocked ? '#D6B25E' : 'rgba(245,245,245,0.55)' }}>
+                              <Sparkles size={15} /> {level.label}
+                            </div>
+                            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.72rem', color: 'rgba(245,245,245,0.35)' }}>
+                              {level.minScore}+
+                            </div>
+                          </div>
+                          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.76rem', color: 'rgba(245,245,245,0.4)', lineHeight: 1.45, marginBottom: 9 }}>
+                            {level.description}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {(level.perks || []).map(perk => (
+                              <span key={perk} style={{ padding: '4px 8px', borderRadius: 999, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.06)', color: unlocked ? '#D6B25E' : 'rgba(245,245,245,0.35)', fontFamily: "'Inter', sans-serif", fontSize: '0.66rem' }}>
+                                {perk}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </motion.div>
               )}

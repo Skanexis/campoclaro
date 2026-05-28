@@ -14,6 +14,9 @@ export interface Product {
   tags: string[]
   gradient: string
   glowColor: string
+  circleMinLevel?: string
+  circleScoreBoost?: number
+  circlePrivateDrop?: boolean
 }
 
 export const FALLBACK_PRODUCTS: Product[] = [

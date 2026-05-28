@@ -57,5 +57,49 @@
       "value": "Viber foto",
       "url": "https://invite.viber.com/?g2=AQBHCFHr%2ByzypFaNsXfqYd4biSbCF1FGOu8AH66AU4EEymDzYsfjX2DYKkcv%2FDBR"
     }
-  ]
+  ],
+  "circle": {
+    "enabled": true,
+    "orderCompletedPoints": 120,
+    "paymentVerifiedPoints": 60,
+    "notificationsPoints": 40,
+    "recurringCustomerPoints": 80,
+    "levels": [
+      {
+        "id": "guest",
+        "label": "Guest",
+        "minScore": 0,
+        "description": "Accesso base al club.",
+        "perks": ["Accesso catalogo", "Area privata"]
+      },
+      {
+        "id": "member",
+        "label": "Member",
+        "minScore": 180,
+        "description": "Cliente verificato con primi vantaggi.",
+        "perks": ["Passport storico", "Notifiche prioritarie"]
+      },
+      {
+        "id": "insider",
+        "label": "Insider",
+        "minScore": 420,
+        "description": "Profilo ricorrente con accesso migliorato.",
+        "perks": ["Priority processing", "Private preview"]
+      },
+      {
+        "id": "priority",
+        "label": "Priority",
+        "minScore": 760,
+        "description": "Corsia preferenziale sui drop selezionati.",
+        "perks": ["Reserved access", "Fast reorder"]
+      },
+      {
+        "id": "vault",
+        "label": "Vault",
+        "minScore": 1200,
+        "description": "Massimo livello CAMPO Circle.",
+        "perks": ["Vault drops", "Accesso riservato"]
+      }
+    ]
+  }
 }

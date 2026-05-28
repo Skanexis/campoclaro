@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { motion, AnimatePresence } from 'motion/react'
-import { Plus, Filter, Search } from 'lucide-react'
+import { Plus, Filter, Search, Crown } from 'lucide-react'
 import { Product } from './data'
 import { useCart } from '../../context/CartContext'
 import { useProducts } from '../../hooks/useProducts'
@@ -136,6 +136,26 @@ function ProductCard({ product }: { product: Product }) {
                 {tag}
               </span>
             ))}
+            {product.circlePrivateDrop && (
+              <span
+                style={{
+                  padding: '2px 7px',
+                  background: 'rgba(214,178,94,0.14)',
+                  border: '1px solid rgba(214,178,94,0.24)',
+                  borderRadius: 3,
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: '0.54rem',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: '#D6B25E',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <Crown size={10} /> Circle
+              </span>
+            )}
           </div>
 
         </div>

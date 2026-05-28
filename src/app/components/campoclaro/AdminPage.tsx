@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode, Ref } from 'react'
 import { motion } from 'motion/react'
-import { BarChart3, Check, ExternalLink, Film, ImageIcon, LogOut, Mail, Package, Save, Send, ShoppingBag, Trash2, Upload, UserCheck, X } from 'lucide-react'
+import { BarChart3, Check, Crown, ExternalLink, Film, ImageIcon, LogOut, Mail, Package, Save, Send, ShoppingBag, Trash2, Upload, UserCheck, X } from 'lucide-react'
 import { Product } from './data'
 import { api, Order, SiteContent } from '../../lib/api'
 import { FALLBACK_SITE_CONTENT } from '../../hooks/useSiteContent'
 import { TelegramStartLogin } from './TelegramStartLogin'
 
-type AdminTab = 'orders' | 'products' | 'filters' | 'contacts' | 'newsletter'
+type AdminTab = 'orders' | 'products' | 'circle' | 'filters' | 'contacts' | 'newsletter'
 type ProductMediaKey = 'images' | 'videos'
 const MEDIA_MAX_BYTES: Record<ProductMediaKey, number> = {
   images: 15 * 1024 * 1024,
@@ -33,6 +33,9 @@ const EMPTY_PRODUCT: Product & { active?: boolean; originalId?: string } = {
   tags: [],
   gradient: 'linear-gradient(135deg, #1a1028 0%, #0a0f1f 60%, #050505 100%)',
   glowColor: 'rgba(214,178,94,0.12)',
+  circleMinLevel: '',
+  circleScoreBoost: 0,
+  circlePrivateDrop: false,
   active: true,
 }
 
@@ -505,6 +508,9 @@ export function AdminPage() {
       ),
       strains: (editing.strains || []).map(item => item.trim()).filter(Boolean),
       tags: (editing.tags || []).map(item => item.trim()).filter(Boolean).slice(0, 2),
+      circleMinLevel: String(editing.circleMinLevel || '').trim(),
+      circleScoreBoost: Math.max(0, Number(editing.circleScoreBoost || 0)),
+      circlePrivateDrop: editing.circlePrivateDrop === true,
     }
     if (Object.keys(cleanProduct.prices).length === 0) {
       setMessage('Inserisci i prezzi, ad esempio: 100g: 500, 500g: 2400')
@@ -529,7 +535,7 @@ export function AdminPage() {
     setMessage('')
     const saved = await api.saveSiteContent(siteContent)
     setSiteContent(saved)
-    setMessage('Contatti salvati')
+    setMessage('Impostazioni salvate')
   }
 
   const updateInfoCard = (index: number, patch: Partial<SiteContent['infoCards'][number]>) => {
@@ -591,8 +597,22 @@ export function AdminPage() {
     await loadAdmin()
   }
 
+  const updateCircleLevel = (index: number, patch: Partial<SiteContent['circle']['levels'][number]>) => {
+    setSiteContent(prev => ({
+      ...prev,
+      circle: {
+        ...prev.circle,
+        levels: prev.circle.levels.map((level, i) => i === index ? { ...level, ...patch } : level),
+      },
+    }))
+  }
+
+  const updateCirclePerks = (index: number, perks: string[]) => {
+    updateCircleLevel(index, { perks: perks.map(item => item.trim()).filter(Boolean).slice(0, 6) })
+  }
+
   const startNewProduct = () => {
-    setEditing({ ...EMPTY_PRODUCT, prices: {}, strains: [], tags: [] })
+    setEditing({ ...EMPTY_PRODUCT, prices: {}, strains: [], tags: [], circleMinLevel: '', circleScoreBoost: 0, circlePrivateDrop: false })
     setPricesInput('')
     setRemovedMedia([])
     setPriceEditorVersion(version => version + 1)
@@ -686,6 +706,12 @@ export function AdminPage() {
     setAuthorized(false)
   }
 
+  const switchTab = (nextTab: AdminTab) => {
+    setTab(nextTab)
+    setMessage('')
+    window.setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0)
+  }
+
   if (checking) return <div style={{ minHeight: '100vh', paddingTop: 120, textAlign: 'center', color: 'rgba(245,245,245,0.5)' }}>Loading...</div>
   if (!authorized) return <AdminLogin onReady={async () => { setAuthorized(true); await loadAdmin() }} />
 
@@ -725,15 +751,21 @@ export function AdminPage() {
           {[
             { id: 'orders', label: 'Ordini' },
             { id: 'products', label: 'Catalogo' },
+            { id: 'circle', label: 'Circle' },
             { id: 'filters', label: 'Filtri' },
             { id: 'contacts', label: 'Contatti' },
             { id: 'newsletter', label: 'Newsletter' },
           ].map(item => (
-            <button key={item.id} className="admin-tab" onClick={() => { setTab(item.id as AdminTab); setMessage('') }} style={{ padding: '9px 18px', borderRadius: 20, background: tab === item.id ? 'rgba(214,178,94,0.16)' : 'transparent', border: tab === item.id ? '1px solid rgba(214,178,94,0.55)' : '1px solid rgba(255,255,255,0.08)', color: tab === item.id ? '#F0C96A' : 'rgba(245,245,245,0.58)', cursor: 'pointer' }}>
+            <button key={item.id} className="admin-tab" onClick={() => switchTab(item.id as AdminTab)} style={{ padding: '9px 18px', borderRadius: 20, background: tab === item.id ? 'rgba(214,178,94,0.16)' : 'transparent', border: tab === item.id ? '1px solid rgba(214,178,94,0.55)' : '1px solid rgba(255,255,255,0.08)', color: tab === item.id ? '#F0C96A' : 'rgba(245,245,245,0.58)', cursor: 'pointer' }}>
               {item.label}
             </button>
           ))}
         </div>
+        {message && (
+          <div className="admin-action-toast">
+            {message}
+          </div>
+        )}
 
         {tab === 'orders' && (
           <motion.div className="admin-list" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ ...panel, overflow: 'visible' }}>
@@ -1079,6 +1111,34 @@ export function AdminPage() {
                   </div>
                 </AdminFormBlock>
 
+                <AdminFormBlock title="CAMPO Circle" className="admin-form-block-wide">
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px auto', gap: 10, alignItems: 'end' }} className="admin-form">
+                    <label style={{ display: 'block' }}>
+                      <span style={{ display: 'block', marginBottom: 7, fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.35)' }}>
+                        Livello minimo
+                      </span>
+                      <select
+                        value={editing.circleMinLevel || ''}
+                        onChange={event => setEditing(p => ({ ...p, circleMinLevel: event.target.value }))}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 6, background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.12)', color: '#F5F5F5' }}
+                      >
+                        <option value="" style={{ background: '#0f0f10' }}>Nessun limite</option>
+                        {siteContent.circle.levels.map(level => (
+                          <option key={level.id} value={level.id} style={{ background: '#0f0f10' }}>{level.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <Field label="Score bonus" value={String(editing.circleScoreBoost || 0)} onChange={v => setEditing(p => ({ ...p, circleScoreBoost: Number(v) || 0 }))} />
+                    <button
+                      type="button"
+                      onClick={() => setEditing(p => ({ ...p, circlePrivateDrop: !p.circlePrivateDrop }))}
+                      style={{ height: 39, padding: '0 12px', borderRadius: 6, border: editing.circlePrivateDrop ? '1px solid rgba(214,178,94,0.45)' : '1px solid rgba(255,255,255,0.1)', background: editing.circlePrivateDrop ? 'rgba(214,178,94,0.1)' : 'rgba(255,255,255,0.03)', color: editing.circlePrivateDrop ? '#D6B25E' : 'rgba(245,245,245,0.55)', cursor: 'pointer' }}
+                    >
+                      Private drop
+                    </button>
+                  </div>
+                </AdminFormBlock>
+
                 <AdminFormBlock title="Descrizioni" className="admin-form-block-wide">
                   <div style={{ display: 'grid', gap: 14 }}>
                     <Field label="Descrizione breve" value={editing.description} onChange={v => setEditing(p => ({ ...p, description: v }))} />
@@ -1143,18 +1203,103 @@ export function AdminPage() {
                   <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.48)' }}>{editing.description || 'Descrizione breve...'}</div>
                 </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 18 }}>
+              <div className="admin-product-actions" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 18 }}>
                 <button disabled={Boolean(mediaUploading)} onClick={saveProduct} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: 'linear-gradient(135deg, #D6B25E, #F0C96A)', color: '#050505', border: 'none', borderRadius: 6, fontWeight: 700, cursor: mediaUploading ? 'wait' : 'pointer', opacity: mediaUploading ? 0.65 : 1 }}>
                   <Save size={16} /> {mediaUploading ? 'Caricamento...' : 'Salva'}
                 </button>
                 {editing.id && (
-                  <button onClick={() => deleteProduct(editing.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: 'rgba(229,115,115,0.08)', color: '#E57373', border: '1px solid rgba(229,115,115,0.25)', borderRadius: 6, cursor: 'pointer' }}>
+                  <button onClick={() => window.confirm(`Eliminare ${editing.name || editing.id}?`) && deleteProduct(editing.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: 'rgba(229,115,115,0.08)', color: '#E57373', border: '1px solid rgba(229,115,115,0.25)', borderRadius: 6, cursor: 'pointer' }}>
                     <Trash2 size={16} /> Elimina
                   </button>
                 )}
               </div>
               {message && <div style={{ marginTop: 14, color: '#D6B25E', fontFamily: "'Inter', sans-serif", fontSize: '0.8rem' }}>{message}</div>}
             </div>
+            </div>
+          </motion.div>
+        )}
+
+        {tab === 'circle' && (
+          <motion.div className="admin-form-panel" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ ...panel, padding: 18 }}>
+            <AdminPanelHeader
+              eyebrow="Retention"
+              title="CAMPO Circle"
+              meta={[
+                { label: 'livelli', value: siteContent.circle.levels.length },
+                { label: 'stato', value: siteContent.circle.enabled ? 'ON' : 'OFF' },
+              ]}
+              action={(
+                <button
+                  type="button"
+                  onClick={() => setSiteContent(p => ({ ...p, circle: { ...p.circle, enabled: !p.circle.enabled } }))}
+                  className="admin-primary-soft-button"
+                >
+                  {siteContent.circle.enabled ? 'Disattiva' : 'Attiva'}
+                </button>
+              )}
+            />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 18 }} className="admin-form">
+              {[
+                ['Ordine completato', 'orderCompletedPoints'],
+                ['Pagamento verificato', 'paymentVerifiedPoints'],
+                ['Notifiche attive', 'notificationsPoints'],
+                ['Cliente ricorrente', 'recurringCustomerPoints'],
+              ].map(([label, key]) => (
+                <Field
+                  key={key}
+                  label={label}
+                  value={String(siteContent.circle[key as keyof SiteContent['circle']] || 0)}
+                  onChange={value => setSiteContent(p => ({ ...p, circle: { ...p.circle, [key]: Number(value) || 0 } }))}
+                />
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.35)' }}>
+                Livelli e privilegi
+              </div>
+              <button
+                type="button"
+                onClick={() => setSiteContent(p => ({ ...p, circle: { ...p.circle, levels: [...p.circle.levels, { id: `level-${p.circle.levels.length + 1}`, label: 'Nuovo livello', minScore: 0, description: '', perks: [] }] } }))}
+                style={{ padding: '8px 12px', background: 'rgba(214,178,94,0.08)', border: '1px solid rgba(214,178,94,0.24)', borderRadius: 6, color: '#D6B25E', cursor: 'pointer' }}
+              >
+                + Livello
+              </button>
+            </div>
+            <div style={{ display: 'grid', gap: 12 }}>
+              {siteContent.circle.levels.map((level, index) => (
+                <div key={`${level.id}-${index}`} style={{ ...panel, padding: 14 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px auto', gap: 12, alignItems: 'end' }} className="admin-form">
+                    <Field label="Nome livello" value={level.label} onChange={value => updateCircleLevel(index, { label: value, id: value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || level.id })} />
+                    <Field label="Score minimo" value={String(level.minScore)} onChange={value => updateCircleLevel(index, { minScore: Number(value) || 0 })} />
+                    <button
+                      type="button"
+                      onClick={() => setSiteContent(p => ({ ...p, circle: { ...p.circle, levels: p.circle.levels.filter((_, i) => i !== index) } }))}
+                      style={{ height: 39, padding: '0 12px', background: 'rgba(229,115,115,0.08)', color: '#E57373', border: '1px solid rgba(229,115,115,0.22)', borderRadius: 6, cursor: 'pointer' }}
+                    >
+                      Rimuovi
+                    </button>
+                  </div>
+                  <div style={{ marginTop: 12 }}>
+                    <Field label="Descrizione" value={level.description} onChange={value => updateCircleLevel(index, { description: value })} />
+                  </div>
+                  <div style={{ marginTop: 12 }}>
+                    <ListEditor
+                      label="Privilegi"
+                      items={level.perks || []}
+                      placeholder="Priority processing"
+                      addLabel="Privilegio"
+                      maxItems={6}
+                      onChange={perks => updateCirclePerks(index, perks)}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 18 }}>
+              <button onClick={saveSiteContent} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: 'linear-gradient(135deg, #D6B25E, #F0C96A)', color: '#050505', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>
+                <Save size={16} /> Salva Circle
+              </button>
+              {message && <div style={{ color: '#D6B25E', fontFamily: "'Inter', sans-serif", fontSize: '0.8rem' }}>{message}</div>}
             </div>
           </motion.div>
         )}
@@ -1359,6 +1504,172 @@ export function AdminPage() {
       </div>
 
       <style>{`
+        .admin-panel-header {
+          padding: 16px 18px;
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+          display: flex;
+          justify-content: space-between;
+          gap: 14px;
+          align-items: center;
+        }
+        .admin-panel-eyebrow {
+          margin-bottom: 5px;
+          font-family: 'Inter', sans-serif;
+          font-size: 0.62rem;
+          letter-spacing: 0.17em;
+          text-transform: uppercase;
+          color: #D6B25E;
+        }
+        .admin-panel-header h2 {
+          margin: 0;
+          font-family: 'Satoshi', sans-serif;
+          font-size: 1.2rem;
+          line-height: 1.1;
+          color: #F5F5F5;
+        }
+        .admin-panel-header-side {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        .admin-panel-meta {
+          display: flex;
+          gap: 7px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+        .admin-panel-meta span {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          min-height: 26px;
+          padding: 4px 8px;
+          border-radius: 999px;
+          background: rgba(255,255,255,0.035);
+          border: 1px solid rgba(255,255,255,0.07);
+          color: rgba(245,245,245,0.42);
+          font-size: 0.66rem;
+          font-family: 'Inter', sans-serif;
+        }
+        .admin-panel-meta strong {
+          color: #D6B25E;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.72rem;
+        }
+        .admin-primary-soft-button {
+          min-height: 32px;
+          padding: 8px 12px;
+          border-radius: 7px;
+          border: 1px solid rgba(214,178,94,0.25);
+          background: rgba(214,178,94,0.08);
+          color: #D6B25E;
+          cursor: pointer;
+          font-family: 'Inter', sans-serif;
+          font-size: 0.76rem;
+          font-weight: 700;
+        }
+        .admin-form-layout {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+        .admin-form-block {
+          min-width: 0;
+          padding: 12px;
+          border-radius: 8px;
+          background: rgba(255,255,255,0.018);
+          border: 1px solid rgba(255,255,255,0.065);
+        }
+        .admin-form-block-wide {
+          grid-column: 1 / -1;
+        }
+        .admin-list-title {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          align-items: center;
+          padding: 12px 14px;
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+          font-family: 'Inter', sans-serif;
+          font-size: 0.68rem;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: rgba(245,245,245,0.36);
+        }
+        .admin-list-title strong {
+          color: #D6B25E;
+          font-family: 'JetBrains Mono', monospace;
+          letter-spacing: 0;
+        }
+        .admin-product-list-scroll {
+          overflow: auto;
+          max-height: min(70vh, 720px);
+        }
+        .admin-product-item:hover {
+          background: rgba(255,255,255,0.045) !important;
+        }
+        .admin-mini-pill {
+          display: inline-flex;
+          align-items: center;
+          min-height: 20px;
+          padding: 2px 7px;
+          border-radius: 999px;
+          background: rgba(214,178,94,0.075);
+          border: 1px solid rgba(214,178,94,0.14);
+          color: rgba(245,245,245,0.58);
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.62rem;
+        }
+        .admin-form-panel {
+          min-width: 0;
+        }
+        .admin-form-panel:focus-within {
+          border-color: rgba(214,178,94,0.24) !important;
+          box-shadow: 0 18px 60px rgba(0,0,0,0.34), 0 0 0 1px rgba(214,178,94,0.08) !important;
+        }
+        .admin-action-toast {
+          position: fixed;
+          right: 18px;
+          bottom: 18px;
+          z-index: 320;
+          max-width: min(420px, calc(100vw - 36px));
+          padding: 11px 13px;
+          border-radius: 8px;
+          border: 1px solid rgba(214,178,94,0.26);
+          background: rgba(12,12,14,0.94);
+          color: #D6B25E;
+          box-shadow: 0 18px 60px rgba(0,0,0,0.42);
+          backdrop-filter: blur(18px);
+          font-family: 'Inter', sans-serif;
+          font-size: 0.78rem;
+          line-height: 1.35;
+        }
+        .admin-form-block:focus-within,
+        .admin-order-card:focus-within,
+        .admin-contact-card:focus-within {
+          border-color: rgba(214,178,94,0.22) !important;
+          background: rgba(214,178,94,0.025) !important;
+        }
+        .admin-form-block input,
+        .admin-form-block textarea,
+        .admin-form-block select,
+        .admin-form-panel input,
+        .admin-form-panel textarea,
+        .admin-form-panel select {
+          min-height: 36px;
+        }
+        .admin-form-block input:focus,
+        .admin-form-block textarea:focus,
+        .admin-form-block select:focus,
+        .admin-form-panel input:focus,
+        .admin-form-panel textarea:focus,
+        .admin-form-panel select:focus,
+        .admin-tracking-panel input:focus {
+          border-color: rgba(214,178,94,0.42) !important;
+          box-shadow: 0 0 0 2px rgba(214,178,94,0.08);
+        }
         .admin-order-label {
           margin-bottom: 5px;
           font-family: 'Inter', sans-serif;
@@ -1439,61 +1750,103 @@ export function AdminPage() {
         }
         @media (max-width: 860px) {
           .cc-admin-page {
-            padding: 84px 12px calc(82px + env(safe-area-inset-bottom, 0px)) !important;
+            padding: 70px 8px calc(74px + env(safe-area-inset-bottom, 0px)) !important;
             overflow-x: hidden;
           }
           .admin-header {
             align-items: flex-start !important;
-            gap: 10px !important;
-            margin-bottom: 18px !important;
+            gap: 8px !important;
+            margin-bottom: 10px !important;
+          }
+          .admin-header > div:first-child > div:first-child {
+            margin-bottom: 4px !important;
+            font-size: 0.58rem !important;
           }
           .admin-title {
-            font-size: clamp(1.35rem, 7.4vw, 1.8rem) !important;
+            font-size: clamp(1.16rem, 6vw, 1.55rem) !important;
             line-height: 1.15 !important;
           }
           .admin-logout {
             flex-shrink: 0;
-            padding: 9px 10px !important;
-            font-size: 0.76rem;
+            padding: 7px 9px !important;
+            font-size: 0.7rem;
           }
           .admin-stats {
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-            gap: 8px !important;
-            margin-bottom: 14px !important;
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+            gap: 5px !important;
+            margin-bottom: 8px !important;
           }
           .admin-stat-card {
-            min-height: 92px;
-            padding: 12px !important;
+            min-height: 64px;
+            padding: 8px 6px !important;
+            text-align: center;
           }
           .admin-stat-card > div:first-child {
-            margin-bottom: 8px !important;
+            margin-bottom: 4px !important;
+          }
+          .admin-stat-card > div:first-child svg {
+            width: 14px;
+            height: 14px;
+          }
+          .admin-stat-card > div:nth-child(2) {
+            font-size: 0.9rem !important;
+          }
+          .admin-stat-card > div:last-child {
+            font-size: 0.48rem !important;
+            letter-spacing: 0.06em !important;
           }
           .admin-tabs {
             box-sizing: border-box;
             display: grid !important;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             width: 100% !important;
-            gap: 5px !important;
-            margin-bottom: 14px !important;
-            padding: 5px !important;
-            border-radius: 12px;
+            gap: 4px !important;
+            margin-bottom: 8px !important;
+            padding: 4px !important;
+            border-radius: 10px;
+            position: sticky;
+            top: 58px;
+            z-index: 70;
+            background: rgba(5,5,5,0.92);
+            backdrop-filter: blur(18px);
             scrollbar-width: none;
           }
           .admin-tabs::-webkit-scrollbar {
             display: none;
           }
           .admin-tab {
-            padding: 8px 12px !important;
-            font-size: 0.76rem;
+            padding: 7px 5px !important;
+            font-size: 0.66rem;
             text-align: center;
+            border-radius: 8px !important;
           }
           .admin-panel-header {
             display: grid;
-            gap: 10px;
-            padding: 13px !important;
+            gap: 7px;
+            padding: 10px !important;
+          }
+          .admin-panel-eyebrow {
+            font-size: 0.54rem;
+            margin-bottom: 3px;
+          }
+          .admin-panel-header h2 {
+            font-size: 1rem;
+          }
+          .admin-panel-meta {
+            gap: 5px;
+          }
+          .admin-panel-meta span {
+            min-height: 22px;
+            padding: 3px 6px;
+            font-size: 0.56rem;
+          }
+          .admin-primary-soft-button {
+            min-height: 28px;
+            padding: 6px 9px;
+            font-size: 0.66rem;
           }
           .admin-form-panel > .admin-panel-header {
-            margin: -18px -18px 14px;
+            margin: -12px -12px 10px;
           }
           .admin-panel-header-side,
           .admin-panel-meta {
@@ -1504,6 +1857,7 @@ export function AdminPage() {
           }
           .admin-form-layout {
             grid-template-columns: 1fr;
+            gap: 8px;
           }
           .admin-row,
           .admin-products,
@@ -1512,14 +1866,128 @@ export function AdminPage() {
             grid-template-columns: 1fr !important;
           }
           .admin-list-row {
+            padding: 9px !important;
+          }
+          .admin-form-panel {
             padding: 12px !important;
+          }
+          .admin-form-block {
+            padding: 9px !important;
+            border-radius: 7px !important;
+          }
+          .admin-form-block > div:first-child,
+          .admin-media-block > div:first-child {
+            margin-bottom: 7px !important;
+          }
+          .admin-form-block input,
+          .admin-form-block textarea,
+          .admin-form-block select,
+          .admin-form-panel input,
+          .admin-form-panel textarea,
+          .admin-form-panel select {
+            min-height: 32px !important;
+            padding: 7px 9px !important;
+            font-size: 0.76rem !important;
+          }
+          .admin-form-block textarea,
+          .admin-form-panel textarea {
+            rows: 3;
+          }
+          .admin-catalog-view {
+            display: grid;
+            gap: 8px;
+          }
+          .admin-products {
+            gap: 8px !important;
+          }
+          .admin-product-list {
+            max-height: 28vh !important;
+            position: sticky !important;
+            top: 142px;
+            z-index: 50;
+          }
+          .admin-list-title {
+            padding: 8px 10px;
+            font-size: 0.58rem;
+          }
+          .admin-product-list-scroll {
+            max-height: calc(28vh - 38px);
+          }
+          .admin-product-item {
+            padding: 9px 10px !important;
+          }
+          .admin-product-item > div:first-child {
+            margin-bottom: 3px !important;
+          }
+          .admin-product-item > div:first-child > div:first-child {
+            font-size: 0.82rem;
+          }
+          .admin-product-item > div:nth-child(2) {
+            display: none;
+          }
+          .admin-mini-pill {
+            min-height: 18px;
+            padding: 1px 6px;
+            font-size: 0.56rem;
+          }
+          .admin-price-row {
+            grid-template-columns: 1fr 92px 34px !important;
+            gap: 6px !important;
+          }
+          .admin-price-row button,
+          .admin-list-editor-row button {
+            width: 34px !important;
+          }
+          .admin-preset-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+            gap: 6px !important;
+          }
+          .admin-preset {
+            min-height: 42px !important;
+            padding: 7px !important;
+          }
+          .admin-preset span:first-child {
+            font-size: 0.66rem !important;
+            margin-bottom: 7px !important;
+          }
+          .admin-media-block {
+            padding: 9px !important;
+          }
+          .admin-media-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: 6px !important;
+          }
+          .admin-media-grid > div {
+            height: 68px !important;
+          }
+          .admin-product-actions {
+            position: sticky;
+            bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+            z-index: 60;
+            margin: 10px -12px -12px !important;
+            padding: 8px 12px;
+            background: rgba(8,8,9,0.92);
+            border-top: 1px solid rgba(255,255,255,0.07);
+            backdrop-filter: blur(16px);
+          }
+          .admin-product-actions button {
+            min-height: 38px;
+            padding: 9px 12px !important;
+          }
+          .admin-action-toast {
+            left: 8px;
+            right: 8px;
+            bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+            max-width: none;
+            padding: 9px 11px;
+            font-size: 0.72rem;
           }
           .admin-orders-grid {
             padding: 6px !important;
             gap: 6px !important;
           }
           .admin-order-card {
-            padding: 9px !important;
+            padding: 8px !important;
             overflow-wrap: anywhere;
           }
           .admin-order-card-header {
@@ -1540,7 +2008,7 @@ export function AdminPage() {
             grid-column: auto;
           }
           .admin-order-info-card {
-            padding: 8px !important;
+            padding: 7px !important;
           }
           .admin-payment-totals {
             grid-template-columns: 1fr !important;
@@ -1549,11 +2017,11 @@ export function AdminPage() {
             align-items: flex-start;
           }
           .admin-tracking-panel {
-            padding: 8px !important;
+            padding: 7px !important;
           }
           .admin-order-filters {
             gap: 6px !important;
-            padding: 10px !important;
+            padding: 7px !important;
             flex-wrap: nowrap !important;
             overflow-x: auto;
             scrollbar-width: none;
@@ -1591,15 +2059,20 @@ export function AdminPage() {
           .admin-order-footer select {
             flex: 1;
           }
-          .admin-product-list {
-            max-height: 38vh;
-            position: static;
-          }
         }
         @media (max-width: 560px) {
           .cc-admin-page {
-            padding-left: 8px !important;
-            padding-right: 8px !important;
+            padding-left: 6px !important;
+            padding-right: 6px !important;
+          }
+          .admin-stats {
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+          }
+          .admin-tabs {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+          .admin-media-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
           }
           .admin-order-filters {
             margin: 0 -1px;
@@ -1619,6 +2092,9 @@ export function AdminPage() {
           }
         }
         @media (max-width: 420px) {
+          .admin-header {
+            margin-bottom: 8px !important;
+          }
           .admin-order-card-header {
             flex-direction: column;
           }
@@ -1631,13 +2107,16 @@ export function AdminPage() {
           .admin-inline-row button {
             width: 100%;
           }
+          .admin-panel-meta span:nth-child(n+4) {
+            display: none;
+          }
         }
         @media (max-width: 340px) {
-          .admin-stats {
-            grid-template-columns: 1fr !important;
-          }
           .admin-tabs {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .admin-stats {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
           }
         }
       `}</style>

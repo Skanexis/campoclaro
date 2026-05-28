@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router'
 import { motion, AnimatePresence } from 'motion/react'
-import { ArrowLeft, Plus, Minus, ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Plus, Minus, ShoppingBag, ChevronLeft, ChevronRight, Fingerprint, ShieldCheck, X, Crown } from 'lucide-react'
 import { useCart } from '../../context/CartContext'
 import { useProducts } from '../../hooks/useProducts'
 import { ProductMediaPreview } from './ProductMediaPreview'
@@ -17,6 +17,7 @@ export function ProductPage() {
   const [quantity, setQuantity] = useState(1)
   const [activeVisual, setActiveVisual] = useState(0)
   const [addedFeedback, setAddedFeedback] = useState(false)
+  const [passportOpen, setPassportOpen] = useState(false)
 
   useEffect(() => {
     if (product) {
@@ -47,6 +48,7 @@ export function ProductPage() {
 
   const currentPrice = product.prices[selectedWeight] || 0
   const totalPrice = currentPrice * quantity
+  const passportPreviewId = `CP-${product.id.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)}-${selectedWeight.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}`
 
   const placeholderVisuals = [
     { label: 'Vista Frontale', angle: 'primary' },
@@ -304,6 +306,27 @@ export function ProductPage() {
                   {tag}
                 </span>
               ))}
+              {(product.circlePrivateDrop || product.circleMinLevel || Number(product.circleScoreBoost || 0) > 0) && (
+                <span
+                  style={{
+                    padding: '3px 10px',
+                    background: 'rgba(214,178,94,0.1)',
+                    border: '1px solid rgba(214,178,94,0.24)',
+                    borderRadius: 3,
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: '0.65rem',
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: '#D6B25E',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                  }}
+                >
+                  <Crown size={12} />
+                  Circle
+                </span>
+              )}
             </div>
 
             {/* Name */}
@@ -329,6 +352,19 @@ export function ProductPage() {
             }}>
               {product.longDescription}
             </p>
+
+            {(product.circlePrivateDrop || product.circleMinLevel || Number(product.circleScoreBoost || 0) > 0) && (
+              <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: 'rgba(214,178,94,0.055)', border: '1px solid rgba(214,178,94,0.14)', display: 'grid', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#D6B25E' }}>
+                  <Crown size={14} /> CAMPO Circle
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {product.circlePrivateDrop && <span style={{ fontSize: '0.68rem', color: 'rgba(245,245,245,0.52)' }}>Private drop</span>}
+                  {product.circleMinLevel && <span style={{ fontSize: '0.68rem', color: 'rgba(245,245,245,0.52)' }}>Accesso: {product.circleMinLevel}</span>}
+                  {Number(product.circleScoreBoost || 0) > 0 && <span style={{ fontSize: '0.68rem', color: '#D6B25E' }}>+{product.circleScoreBoost} score</span>}
+                </div>
+              </div>
+            )}
 
             {/* Weight Selector */}
             <div style={{ marginBottom: 12 }}>
@@ -507,10 +543,148 @@ export function ProductPage() {
                 <ShoppingBag size={16} />
                 {addedFeedback ? 'Aggiunto al Carrello' : 'Aggiungi al Carrello'}
               </motion.button>
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.02, borderColor: 'rgba(214,178,94,0.44)' }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setPassportOpen(true)}
+                style={{
+                  width: '100%',
+                  marginTop: 8,
+                  padding: '10px 16px',
+                  background: 'rgba(214,178,94,0.075)',
+                  color: '#D6B25E',
+                  border: '1px solid rgba(214,178,94,0.22)',
+                  borderRadius: 6,
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+              >
+                <Fingerprint size={15} />
+                Crea Campo Passport
+              </motion.button>
             </div>
           </motion.div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {passportOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setPassportOpen(false)}
+              style={{ position: 'fixed', inset: 0, zIndex: 220, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(10px)' }}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 24, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 24, scale: 0.96 }}
+              transition={{ duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="product-passport-modal"
+              style={{
+                position: 'fixed',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                zIndex: 221,
+                width: 'min(520px, calc(100vw - 28px))',
+                maxHeight: 'calc(100dvh - 28px)',
+                overflowY: 'auto',
+                borderRadius: 10,
+                border: '1px solid rgba(214,178,94,0.28)',
+                background: 'linear-gradient(145deg, #0B0B0D 0%, #121017 58%, #050505 100%)',
+                boxShadow: '0 28px 90px rgba(0,0,0,0.58), 0 0 44px rgba(214,178,94,0.08)',
+              }}
+            >
+              <div style={{ padding: 18, borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.62rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#D6B25E', marginBottom: 5 }}>
+                    Campo Passport
+                  </div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.78rem', color: 'rgba(245,245,245,0.45)' }}>
+                    {passportPreviewId}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPassportOpen(false)}
+                  style={{ width: 34, height: 34, borderRadius: 7, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'rgba(245,245,245,0.55)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div style={{ padding: 18 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: 14, alignItems: 'center', marginBottom: 16 }}>
+                  <div className={gallery.length === 0 ? 'cc-product-orbit' : ''} style={{ width: 96, height: 96, borderRadius: 8, overflow: 'hidden', background: product.gradient, border: '1px solid rgba(214,178,94,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {activeMedia ? (
+                      <ProductMediaPreview image={activeMedia.type === 'image' ? activeMedia.url : undefined} video={activeMedia.type === 'video' ? activeMedia.url : undefined} alt={product.name} />
+                    ) : (
+                      <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(214,178,94,0.28)', boxShadow: '0 0 34px rgba(214,178,94,0.22)' }} />
+                    )}
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: '1.25rem', fontWeight: 800, color: '#F5F5F5', marginBottom: 6 }}>
+                      {product.name}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {[product.category, selectedWeight, selectedStrain].filter(Boolean).map(item => (
+                        <span key={item} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'rgba(245,245,245,0.48)', fontFamily: "'Inter', sans-serif", fontSize: '0.66rem' }}>
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 16 }}>
+                  {[
+                    { label: 'Totale', value: `€${totalPrice}` },
+                    { label: 'Unita', value: String(quantity) },
+                    { label: 'Status', value: 'Ready' },
+                  ].map(item => (
+                    <div key={item.label} style={{ padding: '10px 9px', borderRadius: 7, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.58rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.28)', marginBottom: 5 }}>
+                        {item.label}
+                      </div>
+                      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.86rem', color: item.label === 'Totale' ? '#D6B25E' : '#F5F5F5' }}>
+                        {item.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ padding: 12, borderRadius: 8, background: 'rgba(214,178,94,0.055)', border: '1px solid rgba(214,178,94,0.16)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <ShieldCheck size={18} color="#D6B25E" style={{ flexShrink: 0, marginTop: 1 }} />
+                  <div>
+                    <div style={{ fontFamily: "'Satoshi', sans-serif", color: '#F5F5F5', fontWeight: 700, fontSize: '0.9rem', marginBottom: 4 }}>
+                      Passport attivato nel checkout
+                    </div>
+                    <div style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.42)', fontSize: '0.75rem', lineHeight: 1.5 }}>
+                      Dopo l'ordine troverai ID verificabile, pagamento, tracking, stato live e contatti ufficiali nella tua area privata.
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { handleAdd(); setPassportOpen(false) }}
+                  style={{ width: '100%', marginTop: 14, padding: '12px', border: 'none', borderRadius: 6, background: 'linear-gradient(135deg, #D6B25E, #F0C96A)', color: '#050505', cursor: 'pointer', fontFamily: "'Inter', sans-serif", fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}
+                >
+                  Aggiungi con Passport
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Related Products */}
       <div style={{

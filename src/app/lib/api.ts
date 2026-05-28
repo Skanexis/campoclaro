@@ -7,10 +7,14 @@ export interface OrderItem {
   strain?: string
   price: number
   quantity: number
+  circleScoreBoost?: number
 }
 
 export interface Order {
   id: string
+  passportId?: string
+  verificationCode?: string
+  passportIssuedAt?: string
   createdAt: string
   status: string
   delivery: string
@@ -49,6 +53,7 @@ export interface Order {
   subtotal?: number
   fees?: number
   total: number
+  circleScoreAward?: number
 }
 
 export type CryptoPaymentOrder = Pick<Order, 'id' | 'createdAt' | 'status' | 'payment' | 'total'> & Partial<Order>
@@ -61,6 +66,14 @@ export interface SiteContent {
   contactsTitle: string
   contactsIntro: string
   contacts: Array<{ label: string; value: string; url: string }>
+  circle: {
+    enabled: boolean
+    orderCompletedPoints: number
+    paymentVerifiedPoints: number
+    notificationsPoints: number
+    recurringCustomerPoints: number
+    levels: Array<{ id: string; label: string; minScore: number; description: string; perks: string[] }>
+  }
 }
 
 export interface CryptoWalletAvailability {

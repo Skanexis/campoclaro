@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { motion, AnimatePresence } from 'motion/react'
-import { X, Plus, Minus, Trash2, Truck, MapPin, ChevronRight, Check, ArrowLeft, Copy } from 'lucide-react'
+import { X, Plus, Minus, Trash2, Truck, MapPin, ChevronRight, Check, ArrowLeft, Copy, Fingerprint } from 'lucide-react'
 import { useCart } from '../../context/CartContext'
 import { api, type Order } from '../../lib/api'
 import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
@@ -930,6 +930,22 @@ export function CartDrawer() {
                         ? `${delivery === 'meetup' ? 'Acconto Meetup 25%: ' : ''}Invia esattamente ${lastOrder?.cryptoExpectedAmount || ''} ${lastOrder?.cryptoExpectedUnit || selectedCrypto.label}. Il sistema verifica automaticamente la blockchain.`
                         : 'Il tuo ordine è stato registrato. Riceverai conferma a breve.'}
                     </div>
+                    {lastOrder && (
+                      <div style={{ width: 'min(340px, 100%)', margin: '18px auto 0', padding: 14, background: 'rgba(214,178,94,0.06)', border: '1px solid rgba(214,178,94,0.22)', borderRadius: 8, textAlign: 'left' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                          <Fingerprint size={15} color="#D6B25E" />
+                          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.68rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#D6B25E' }}>
+                            Campo Passport
+                          </div>
+                        </div>
+                        <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#F5F5F5', fontSize: '0.82rem', wordBreak: 'break-all', marginBottom: 6 }}>
+                          {lastOrder.passportId || lastOrder.id}
+                        </div>
+                        <div style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.38)', fontSize: '0.72rem', lineHeight: 1.45 }}>
+                          Apri Area Privata per QR, verifica, pagamento e tracking live.
+                        </div>
+                      </div>
+                    )}
                     {lastOrder?.payment === 'crypto' && (
                       <button
                         type="button"

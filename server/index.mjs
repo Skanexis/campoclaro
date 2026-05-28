@@ -48,6 +48,20 @@ const defaultSiteContent = {
     { label: 'Canale Potato prodotti', value: 'Campoclaroreal', url: 'https://tatokdym.org/Campoclaroreal' },
     { label: 'Canale Viber foto', value: 'Viber foto', url: 'https://invite.viber.com/?g2=AQBHCFHr%2ByzypFaNsXfqYd4biSbCF1FGOu8AH66AU4EEymDzYsfjX2DYKkcv%2FDBR' },
   ],
+  circle: {
+    enabled: true,
+    orderCompletedPoints: 120,
+    paymentVerifiedPoints: 60,
+    notificationsPoints: 40,
+    recurringCustomerPoints: 80,
+    levels: [
+      { id: 'guest', label: 'Guest', minScore: 0, description: 'Accesso base al club.', perks: ['Accesso catalogo', 'Area privata'] },
+      { id: 'member', label: 'Member', minScore: 180, description: 'Cliente verificato con primi vantaggi.', perks: ['Passport storico', 'Notifiche prioritarie'] },
+      { id: 'insider', label: 'Insider', minScore: 420, description: 'Profilo ricorrente con accesso migliorato.', perks: ['Priority processing', 'Private preview'] },
+      { id: 'priority', label: 'Priority', minScore: 760, description: 'Corsia preferenziale sui drop selezionati.', perks: ['Reserved access', 'Fast reorder'] },
+      { id: 'vault', label: 'Vault', minScore: 1200, description: 'Massimo livello CAMPO Circle.', perks: ['Vault drops', 'Accesso riservato'] },
+    ],
+  },
 }
 
 const app = express()
@@ -599,6 +613,9 @@ function normalizeProduct(input, existing = {}) {
     tags: Array.isArray(input.tags) ? input.tags.map(String).map(v => v.trim()).filter(Boolean).slice(0, 2) : [],
     gradient: String(input.gradient || existing.gradient || 'linear-gradient(135deg, #111 0%, #222 60%, #050505 100%)'),
     glowColor: String(input.glowColor || existing.glowColor || 'rgba(214,178,94,0.12)'),
+    circleMinLevel: String(input.circleMinLevel || existing.circleMinLevel || '').trim(),
+    circleScoreBoost: Number.isFinite(Number(input.circleScoreBoost)) ? Math.max(0, Number(input.circleScoreBoost)) : Number(existing.circleScoreBoost || 0),
+    circlePrivateDrop: input.circlePrivateDrop === true,
     active: input.active !== false,
   }
 }
@@ -613,6 +630,16 @@ function createProductId(name, products) {
 }
 
 function normalizeSiteContent(input = {}) {
+  const circleInput = input.circle && typeof input.circle === 'object' ? input.circle : defaultSiteContent.circle
+  const circleLevels = Array.isArray(circleInput.levels)
+    ? circleInput.levels.map((level, index) => ({
+      id: String(level.id || level.label || `level-${index + 1}`).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `level-${index + 1}`,
+      label: String(level.label || '').trim(),
+      minScore: Math.max(0, Number(level.minScore || 0)),
+      description: String(level.description || '').trim(),
+      perks: Array.isArray(level.perks) ? level.perks.map(String).map(v => v.trim()).filter(Boolean).slice(0, 6) : [],
+    })).filter(level => level.label)
+    : defaultSiteContent.circle.levels
   return {
     welcomeTitle: String(input.welcomeTitle || defaultSiteContent.welcomeTitle).trim(),
     welcomeSubtitle: String(input.welcomeSubtitle || defaultSiteContent.welcomeSubtitle).trim(),
@@ -634,6 +661,14 @@ function normalizeSiteContent(input = {}) {
         url: String(contact.url || '').trim(),
       })).filter(contact => contact.label || contact.value || contact.url)
       : defaultSiteContent.contacts,
+    circle: {
+      enabled: circleInput.enabled !== false,
+      orderCompletedPoints: Math.max(0, Number(circleInput.orderCompletedPoints ?? defaultSiteContent.circle.orderCompletedPoints)),
+      paymentVerifiedPoints: Math.max(0, Number(circleInput.paymentVerifiedPoints ?? defaultSiteContent.circle.paymentVerifiedPoints)),
+      notificationsPoints: Math.max(0, Number(circleInput.notificationsPoints ?? defaultSiteContent.circle.notificationsPoints)),
+      recurringCustomerPoints: Math.max(0, Number(circleInput.recurringCustomerPoints ?? defaultSiteContent.circle.recurringCustomerPoints)),
+      levels: circleLevels.sort((a, b) => a.minScore - b.minScore),
+    },
   }
 }
 
@@ -991,6 +1026,24 @@ app.post('/api/orders', async (req, res) => {
   }
 
   const subtotal = items.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0)
+  const productsForCircle = await readJson(productsFile, [])
+  const productById = new Map(productsForCircle.map(product => [String(product.id), product]))
+  const orderItems = items.map(item => {
+    const product = productById.get(String(item.id))
+    const circleScoreBoost = Math.max(0, Number(product?.circleScoreBoost || 0))
+    return {
+      productId: String(item.id),
+      name: String(item.name),
+      weight: String(item.weight),
+      strain: String(item.strain || ''),
+      price: Number(item.price),
+      quantity: Number(item.quantity),
+      circleScoreBoost,
+      circlePrivateDrop: product?.circlePrivateDrop === true,
+      circleMinLevel: String(product?.circleMinLevel || ''),
+    }
+  })
+  const circleScoreAward = orderItems.reduce((sum, item) => sum + Number(item.circleScoreBoost || 0) * Number(item.quantity || 1), 0)
   const fees = payment === 'ccpp' ? ccppFee : 0
   const total = subtotal + fees
   const paymentDueEur = delivery === 'meetup' ? meetupDepositForTotal(total) : total
@@ -1008,8 +1061,20 @@ app.post('/api/orders', async (req, res) => {
   const requestedCourier = String(req.body.courier || 'UPS').trim()
   const courier = delivery === 'ship' && allowedCouriers.has(requestedCourier) ? requestedCourier : ''
 
+  const orderId = `CC-${new Date().getFullYear()}-${nanoid(6).toUpperCase()}`
+  const passportId = `CP-${nanoid(10).toUpperCase()}`
+  const verificationCode = crypto
+    .createHash('sha256')
+    .update(`${orderId}:${customer.id}:${sessionSecret}`)
+    .digest('hex')
+    .slice(0, 12)
+    .toUpperCase()
+
   const order = {
-    id: `CC-${new Date().getFullYear()}-${nanoid(6).toUpperCase()}`,
+    id: orderId,
+    passportId,
+    verificationCode,
+    passportIssuedAt: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     status: 'new',
     delivery,
@@ -1036,17 +1101,11 @@ app.post('/api/orders', async (req, res) => {
     trackingProvider: 'Auto Free',
     trackingUrl: '',
     address: cleanAddress,
-    items: items.map(item => ({
-      productId: String(item.id),
-      name: String(item.name),
-      weight: String(item.weight),
-      strain: String(item.strain || ''),
-      price: Number(item.price),
-      quantity: Number(item.quantity),
-    })),
+    items: orderItems,
     subtotal,
     fees,
     total,
+    circleScoreAward,
   }
 
   const orders = await readJson(ordersFile, [])
@@ -1065,6 +1124,9 @@ app.get('/api/orders/:id/public', async (req, res) => {
   if (!order) return res.status(404).json({ error: 'Order not found' })
   res.json({
     id: order.id,
+    passportId: order.passportId || '',
+    verificationCode: order.verificationCode || '',
+    passportIssuedAt: order.passportIssuedAt || order.createdAt,
     createdAt: order.createdAt,
     status: order.status,
     payment: order.payment,
