@@ -2,7 +2,7 @@ import { type ReactElement, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { motion, AnimatePresence } from 'motion/react'
 import { QRCodeSVG } from 'qrcode.react'
-import { User, Package, Settings, ChevronRight, Clock, Check, Truck, Shield, LogOut, Fingerprint, Copy, LockKeyhole, Crown, Sparkles } from 'lucide-react'
+import { User, Package, Settings, ChevronRight, Clock, Check, Truck, Shield, LogOut, Fingerprint, Copy, LockKeyhole, Crown, Sparkles, ArrowLeft } from 'lucide-react'
 import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
 import { api, Order } from '../../lib/api'
 import { CryptoPaymentModal } from './CryptoPaymentModal'
@@ -113,7 +113,7 @@ function OrderPassport({ order }: { order: Order }) {
       padding: 14,
       borderRadius: 9,
       border: '1px solid rgba(214,178,94,0.18)',
-      background: 'linear-gradient(145deg, rgba(214,178,94,0.075), rgba(255,255,255,0.025) 44%, rgba(5,5,5,0.25))',
+      background: '#0b0b0c',
       boxShadow: '0 18px 60px rgba(0,0,0,0.22)',
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
@@ -335,6 +335,7 @@ export function ProfilePage() {
   const siteContent = useSiteContent()
   const [user, setUser] = useState<null | { id: string; username?: string; firstName?: string; role?: string }>(null)
   const [customerSignedIn, setCustomerSignedIn] = useState(false)
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const [orders, setOrders] = useState<Order[]>([])
   const { notificationsEnabled, setNotificationsEnabled } = useNotificationPreferences()
   const [confirmOrders, setConfirmOrders] = useState(true)
@@ -356,6 +357,7 @@ export function ProfilePage() {
     setUser(customer ? { ...customer, role: admin?.role } : admin)
     setOrders(ordersResult.status === 'fulfilled' ? ordersResult.value : [])
     setNewsletterEnabled(newsletterResult.status === 'fulfilled' ? newsletterResult.value.enabled : false)
+    setCheckingAuth(false)
   }
 
   useEffect(() => {
@@ -365,6 +367,7 @@ export function ProfilePage() {
         setUser(null)
         setCustomerSignedIn(false)
         setOrders([])
+        setCheckingAuth(false)
       }
     })
     return () => {
@@ -426,11 +429,30 @@ export function ProfilePage() {
 
   const navItems = [
     { id: 'profile' as SidebarSection, label: 'Profilo', icon: <User size={16} /> },
-    { id: 'circle' as SidebarSection, label: 'Circle', icon: <Crown size={16} /> },
     { id: 'orders' as SidebarSection, label: 'Ordini', icon: <Package size={16} /> },
     { id: 'settings' as SidebarSection, label: 'Impostazioni', icon: <Settings size={16} /> },
     ...(isAdmin ? [{ id: 'admin' as SidebarSection, label: 'Admin', icon: <Shield size={16} /> }] : []),
   ]
+
+  if (checkingAuth) {
+    return (
+      <div className="cc-profile-page" style={{ minHeight: '100dvh', paddingTop: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '92px 18px 28px' }}>
+        <div style={{ width: 'min(420px, 100%)', padding: 18, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: '#0b0b0c', color: 'rgba(245,245,245,0.45)', fontFamily: "'Inter', sans-serif", fontSize: '0.84rem', textAlign: 'center' }}>
+          Verifica accesso...
+        </div>
+      </div>
+    )
+  }
+
+  if (!customerSignedIn) {
+    return (
+      <div className="cc-profile-page" style={{ minHeight: '100dvh', paddingTop: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '92px 18px 28px' }}>
+        <div style={{ width: 'min(440px, 100%)' }}>
+          <ProfileTelegramLogin onReady={loadDashboard} />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="cc-profile-page" style={{ height: '100dvh', paddingTop: 72, overflow: 'hidden' }}>
@@ -487,7 +509,7 @@ export function ProfilePage() {
                 width: 40,
                 height: 40,
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, rgba(214,178,94,0.2), rgba(240,201,106,0.1))',
+                background: 'rgba(214,178,94,0.1)',
                 border: '1px solid rgba(214,178,94,0.2)',
                 display: 'flex',
                 alignItems: 'center',
@@ -549,9 +571,8 @@ export function ProfilePage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.15 }}
             className="profile-content"
-            style={{ minHeight: 0, overflow: 'hidden' }}
+            style={{ minHeight: 0, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain' }}
           >
-            {!customerSignedIn && <ProfileTelegramLogin onReady={loadDashboard} />}
             <AnimatePresence mode="wait">
               {/* PROFILE */}
               {active === 'profile' && (
@@ -562,6 +583,90 @@ export function ProfilePage() {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.25 }}
                 >
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setActive('circle')}
+                    onKeyDown={event => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        setActive('circle')
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: 0,
+                      border: 'none',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      marginBottom: 10,
+                    }}
+                  >
+                    <div style={{ padding: 16, borderRadius: 8, border: '1px solid rgba(214,178,94,0.18)', background: '#0b0b0c' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                          <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(214,178,94,0.12)', border: '1px solid rgba(214,178,94,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Crown size={17} color="#D6B25E" />
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.58rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#D6B25E', marginBottom: 3 }}>
+                              CAMPO Circle
+                            </div>
+                            <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: '1rem', fontWeight: 800, color: '#F5F5F5' }}>
+                              {circle.current?.label || 'Guest'}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.92rem', fontWeight: 800, color: '#D6B25E' }}>
+                              {customerSignedIn ? circle.score : '-'} XP
+                            </div>
+                            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.56rem', color: 'rgba(245,245,245,0.34)' }}>
+                              progresso
+                            </div>
+                          </div>
+                          <ChevronRight size={16} color="rgba(245,245,245,0.38)" />
+                        </div>
+                      </div>
+                      <div style={{ height: 7, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 10 }}>
+                        <div style={{ width: `${customerSignedIn ? circle.progress : 0}%`, height: '100%', borderRadius: 999, background: '#D6B25E' }} />
+                      </div>
+                      {(!notificationsEnabled || orders.length === 0) && (
+                        <div style={{ display: 'grid', gap: 7 }}>
+                          {!notificationsEnabled && (
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              onClick={event => { event.preventDefault(); event.stopPropagation(); setNotificationsEnabled(true) }}
+                              onKeyDown={event => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault()
+                                  setNotificationsEnabled(true)
+                                }
+                              }}
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 10px', borderRadius: 7, background: 'rgba(0,0,0,0.16)', border: '1px solid rgba(214,178,94,0.14)' }}
+                            >
+                              <span style={{ color: 'rgba(245,245,245,0.64)', fontSize: '0.76rem' }}>Attiva notifiche ordine</span>
+                              <span style={{ color: '#D6B25E', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.68rem' }}>+XP</span>
+                            </div>
+                          )}
+                          {orders.length === 0 && (
+                            <Link
+                              to="/catalogo"
+                              onClick={event => event.stopPropagation()}
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 10px', borderRadius: 7, background: 'rgba(0,0,0,0.16)', border: '1px solid rgba(255,255,255,0.07)', textDecoration: 'none' }}
+                            >
+                              <span style={{ color: 'rgba(245,245,245,0.64)', fontSize: '0.76rem' }}>Completa il primo ordine</span>
+                              <span style={{ color: '#D6B25E', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.68rem' }}>+120 XP</span>
+                            </Link>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="profile-account-panel" style={{
                     padding: '16px',
                     background: 'rgba(255,255,255,0.02)',
@@ -633,79 +738,92 @@ export function ProfilePage() {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.25 }}
                 >
-                  <div style={{ padding: 18, background: 'linear-gradient(145deg, rgba(214,178,94,0.08), rgba(255,255,255,0.025))', border: '1px solid rgba(214,178,94,0.16)', borderRadius: 8, marginBottom: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start', marginBottom: 16 }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#D6B25E', marginBottom: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setActive('profile')}
+                    style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10, padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'rgba(245,245,245,0.58)', cursor: 'pointer', fontFamily: "'Inter', sans-serif", fontSize: '0.76rem' }}
+                  >
+                    <ArrowLeft size={14} /> Profilo
+                  </button>
+                  <div style={{ padding: 18, background: '#0b0b0c', border: '1px solid rgba(214,178,94,0.16)', borderRadius: 8, marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, marginBottom: 14 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#D6B25E', marginBottom: 7 }}>
                           <Crown size={18} />
                           <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.16em', textTransform: 'uppercase' }}>CAMPO Circle</span>
                         </div>
-                        <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: '1.55rem', fontWeight: 800, color: '#F5F5F5', marginBottom: 5 }}>
+                        <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: '1.45rem', fontWeight: 800, color: '#F5F5F5' }}>
                           {circle.current?.label || 'Guest'}
                         </div>
-                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.42)', lineHeight: 1.5 }}>
-                          {circle.current?.description || 'Il tuo livello privato CAMPOCLARO.'}
-                        </div>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '1.55rem', fontWeight: 800, color: '#D6B25E' }}>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '1.35rem', fontWeight: 800, color: '#D6B25E' }}>
                           {customerSignedIn ? circle.score : '-'}
                         </div>
-                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.62rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.32)' }}>
-                          Access Score
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.32)' }}>
+                          Score
                         </div>
                       </div>
                     </div>
                     <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.07)', overflow: 'hidden', marginBottom: 9 }}>
-                      <div style={{ width: `${customerSignedIn ? circle.progress : 0}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #D6B25E, #F0C96A)' }} />
+                      <div style={{ width: `${customerSignedIn ? circle.progress : 0}%`, height: '100%', borderRadius: 999, background: '#D6B25E' }} />
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.38)' }}>
-                      <span>{circle.current?.label || 'Guest'}</span>
-                      <span>{circle.next ? `${circle.next.minScore - circle.score} punti a ${circle.next.label}` : 'Livello massimo'}</span>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.78rem', color: 'rgba(245,245,245,0.46)', lineHeight: 1.5 }}>
+                      {circle.next
+                        ? `Continua a completare ordini per raggiungere ${circle.next.label}.`
+                        : 'Hai sbloccato il livello massimo.'}
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }} className="profile-account-grid">
-                    {[
-                      { label: 'Ordini completati', value: orders.filter(order => order.status === 'completed').length, detail: `+${siteContent.circle.orderCompletedPoints} cad.` },
-                      { label: 'Pagamenti verificati', value: orders.filter(order => order.paymentStatus === 'paid_confirmed').length, detail: `+${siteContent.circle.paymentVerifiedPoints} cad.` },
-                      { label: 'Notifiche', value: notificationsEnabled ? 'Attive' : 'Off', detail: notificationsEnabled ? `+${siteContent.circle.notificationsPoints}` : '+0' },
-                      { label: 'Ricorrenza', value: orders.length > 1 ? 'Attiva' : 'In attesa', detail: orders.length > 1 ? `+${siteContent.circle.recurringCustomerPoints}` : '+0' },
-                      { label: 'Bonus prodotti', value: orders.reduce((sum, order) => sum + Number(order.circleScoreAward || 0), 0), detail: 'da drop Circle' },
-                    ].map(item => (
-                      <div key={item.label} style={{ padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.28)', marginBottom: 5 }}>
-                          {item.label}
-                        </div>
-                        <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 800, color: '#F5F5F5', marginBottom: 3 }}>
-                          {item.value}
-                        </div>
-                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.68rem', color: '#D6B25E' }}>
-                          {item.detail}
-                        </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }} className="profile-account-grid">
+                    <div style={{ padding: 14, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'Satoshi', sans-serif", fontWeight: 800, color: '#F5F5F5', marginBottom: 8 }}>
+                        <Sparkles size={15} color="#D6B25E" /> Privilegi attivi
                       </div>
-                    ))}
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {(circle.current?.perks || []).length ? circle.current?.perks.map(perk => (
+                          <span key={perk} style={{ padding: '5px 8px', borderRadius: 999, background: 'rgba(214,178,94,0.08)', border: '1px solid rgba(214,178,94,0.14)', color: '#D6B25E', fontSize: '0.68rem' }}>
+                            {perk}
+                          </span>
+                        )) : (
+                          <span style={{ color: 'rgba(245,245,245,0.36)', fontSize: '0.78rem' }}>Nessun privilegio attivo.</span>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ padding: 14, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 800, color: '#F5F5F5', marginBottom: 8 }}>
+                        Come salire
+                      </div>
+                      {[
+                        orders.length === 0 ? `Primo ordine +${siteContent.circle.orderCompletedPoints} XP` : 'Ordini completati aumentano il livello',
+                        'Pagamenti verificati aumentano la fiducia',
+                        notificationsEnabled ? 'Notifiche attive' : 'Attiva notifiche per sbloccare XP',
+                      ].map(item => (
+                        <div key={item} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', color: 'rgba(245,245,245,0.48)', fontSize: '0.76rem' }}>
+                          {item}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-
-                  <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
+                  <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
                     {circle.levels.map(level => {
                       const unlocked = circle.score >= level.minScore
                       return (
-                        <div key={level.id} style={{ padding: 14, borderRadius: 8, background: unlocked ? 'rgba(214,178,94,0.055)' : 'rgba(255,255,255,0.018)', border: unlocked ? '1px solid rgba(214,178,94,0.16)' : '1px solid rgba(255,255,255,0.05)', opacity: customerSignedIn ? 1 : 0.65 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+                        <div key={level.id} style={{ padding: 12, borderRadius: 8, background: unlocked ? 'rgba(214,178,94,0.055)' : 'rgba(255,255,255,0.018)', border: unlocked ? '1px solid rgba(214,178,94,0.16)' : '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 7 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'Satoshi', sans-serif", fontWeight: 800, color: unlocked ? '#D6B25E' : 'rgba(245,245,245,0.55)' }}>
-                              <Sparkles size={15} /> {level.label}
+                              <Sparkles size={14} /> {level.label}
                             </div>
-                            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.72rem', color: 'rgba(245,245,245,0.35)' }}>
-                              {level.minScore}+
-                            </div>
+                            <span style={{ fontSize: '0.66rem', color: unlocked ? '#D6B25E' : 'rgba(245,245,245,0.32)' }}>
+                              {unlocked ? 'Sbloccato' : 'Da sbloccare'}
+                            </span>
                           </div>
-                          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.76rem', color: 'rgba(245,245,245,0.4)', lineHeight: 1.45, marginBottom: 9 }}>
+                          <div style={{ fontSize: '0.74rem', color: 'rgba(245,245,245,0.42)', lineHeight: 1.45, marginBottom: 8 }}>
                             {level.description}
                           </div>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             {(level.perks || []).map(perk => (
-                              <span key={perk} style={{ padding: '4px 8px', borderRadius: 999, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.06)', color: unlocked ? '#D6B25E' : 'rgba(245,245,245,0.35)', fontFamily: "'Inter', sans-serif", fontSize: '0.66rem' }}>
+                              <span key={perk} style={{ padding: '4px 8px', borderRadius: 999, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.06)', color: unlocked ? '#D6B25E' : 'rgba(245,245,245,0.35)', fontSize: '0.66rem' }}>
                                 {perk}
                               </span>
                             ))}
@@ -875,7 +993,7 @@ export function ProfilePage() {
                         whileTap={{ scale: 0.98 }}
                         style={{
                           padding: '12px 18px',
-                          background: 'linear-gradient(135deg, #D6B25E, #F0C96A)',
+                          background: '#D6B25E',
                           color: '#050505',
                           border: 'none',
                           borderRadius: 6,
@@ -913,6 +1031,8 @@ export function ProfilePage() {
         .profile-content > div,
         .profile-content > div > div {
           min-height: 0;
+          max-width: 100%;
+          overflow-wrap: anywhere;
         }
         .profile-orders-section {
           height: 100%;
@@ -990,6 +1110,8 @@ export function ProfilePage() {
           .profile-content {
             min-width: 0;
             min-height: 0;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
           }
           .profile-account-panel {
             padding: 10px !important;
@@ -1074,7 +1196,7 @@ export function ProfilePage() {
           padding: 4px 11px 4px 7px;
           border-radius: 20px;
           color: #D6B25E;
-          background: linear-gradient(90deg, rgba(214,178,94,0.09), rgba(214,178,94,0.18), rgba(214,178,94,0.09));
+          background: rgba(214,178,94,0.09);
           border: 1px solid rgba(214,178,94,0.32);
           box-shadow: 0 0 22px rgba(214,178,94,0.08);
           overflow: hidden;
@@ -1097,7 +1219,7 @@ export function ProfilePage() {
           right: 1px;
           bottom: 2px;
           height: 1px;
-          background: repeating-linear-gradient(90deg, rgba(214,178,94,0.3) 0 5px, transparent 5px 9px);
+          background: rgba(214,178,94,0.28);
           animation: roadMove 0.55s linear infinite;
         }
         .transit-truck {

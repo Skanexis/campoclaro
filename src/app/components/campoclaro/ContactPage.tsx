@@ -16,7 +16,7 @@ export function ContactPage() {
     <div className="cc-contact-page" style={{ minHeight: '100vh', paddingTop: 72 }}>
       <section className="contact-hero" style={{
         padding: '72px 24px 40px',
-        background: 'linear-gradient(180deg, rgba(214,178,94,0.08), transparent)',
+        background: '#050505',
         borderBottom: '1px solid rgba(255,255,255,0.04)',
       }}>
         <div style={{ maxWidth: 1080, margin: '0 auto' }}>
@@ -88,7 +88,7 @@ export function ContactPage() {
                 style={{
                   minHeight: 132,
                   padding: 20,
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.035), rgba(214,178,94,0.025))',
+                  background: '#0b0b0c',
                   border: '1px solid rgba(255,255,255,0.07)',
                   borderRadius: 8,
                   textDecoration: 'none',

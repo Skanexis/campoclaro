@@ -76,12 +76,7 @@ export function Navbar() {
                 letterSpacing: '0.2em',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
-                background: 'linear-gradient(90deg, #D6B25E 0%, #F0C96A 25%, #FFFDE7 50%, #F0C96A 75%, #D6B25E 100%)',
-                backgroundSize: '200% auto',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                animation: 'shimmerGold 5s linear infinite',
+                color: '#D6B25E',
               }}
             >
               CAMPOCLARO
@@ -223,7 +218,7 @@ export function Navbar() {
             height: 1,
             transformOrigin: '0% 50%',
             scaleX: scrollProgress,
-            background: 'linear-gradient(90deg, rgba(214,178,94,0), rgba(214,178,94,0.95), rgba(240,201,106,0.25))',
+            background: '#D6B25E',
             boxShadow: '0 0 18px rgba(214,178,94,0.28)',
           }}
         />

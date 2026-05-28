@@ -34,7 +34,7 @@ export const FALLBACK_PRODUCTS: Product[] = [
     thc: 'N/D',
     cbd: 'N/D',
     tags: ['Premium', 'Filtrato'],
-    gradient: 'linear-gradient(135deg, #08080a 0%, #17131d 55%, #030304 100%)',
+    gradient: '#0d0d0e',
     glowColor: 'rgba(214,178,94,0.12)',
   },
   {
@@ -51,7 +51,7 @@ export const FALLBACK_PRODUCTS: Product[] = [
     thc: 'N/D',
     cbd: 'N/D',
     tags: ['Exotic terps', 'Creamy vibes'],
-    gradient: 'linear-gradient(135deg, #08080a 0%, #17131d 55%, #030304 100%)',
+    gradient: '#0d0d0e',
     glowColor: 'rgba(214,178,94,0.12)',
   },
   {
@@ -68,7 +68,7 @@ export const FALLBACK_PRODUCTS: Product[] = [
     thc: 'N/D',
     cbd: 'N/D',
     tags: ['Frozen quality', 'Heavy flavour'],
-    gradient: 'linear-gradient(135deg, #08080a 0%, #17131d 55%, #030304 100%)',
+    gradient: '#0d0d0e',
     glowColor: 'rgba(214,178,94,0.12)',
   },
 ]

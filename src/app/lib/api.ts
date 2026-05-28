@@ -58,6 +58,21 @@ export interface Order {
 
 export type CryptoPaymentOrder = Pick<Order, 'id' | 'createdAt' | 'status' | 'payment' | 'total'> & Partial<Order>
 
+export interface AdminCustomer {
+  id: string
+  firstName: string
+  lastName: string
+  username: string
+  newsletterEnabled: boolean
+  ordersCount: number
+  completedOrders: number
+  totalSpent: number
+  lastOrderAt: string
+  lastOrderId: string
+  lastOrderStatus: string
+  firstSeenAt: string
+}
+
 export interface SiteContent {
   welcomeTitle: string
   welcomeSubtitle: string
@@ -171,7 +186,8 @@ export const api = {
   newsletterPreference: () => request<{ enabled: boolean }>('/api/customer/newsletter'),
   saveNewsletterPreference: (enabled: boolean) =>
     request<{ enabled: boolean }>('/api/customer/newsletter', { method: 'PUT', body: JSON.stringify({ enabled }) }),
-  adminStats: () => request<{ products: number; orders: number; revenue: number; pending: number; newsletterSubscribers?: number }>('/api/admin/stats'),
+  adminStats: () => request<{ products: number; orders: number; revenue: number; pending: number; newsletterSubscribers?: number; customers?: number }>('/api/admin/stats'),
+  adminCustomers: () => request<AdminCustomer[]>('/api/admin/customers'),
   adminProducts: () => request<Product[]>('/api/admin/products'),
   adminSiteContent: () => request<SiteContent>('/api/admin/site-content'),
   saveSiteContent: (content: SiteContent) =>

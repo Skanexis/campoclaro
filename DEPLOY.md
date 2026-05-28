@@ -273,16 +273,18 @@ the first update to the new layout:
 cd /opt/campoclaro
 docker compose stop app
 mkdir -p /opt/campoclaro-data
-cp -a server/data/. /opt/campoclaro-data/
+cp -an server/data/. /opt/campoclaro-data/
 git restore --source=HEAD --staged --worktree -- server/data server-api.err.log server-api.out.log vite-dev.err.log vite-dev.out.log
 git pull
 docker compose up -d --build
 docker compose logs -f app
 ```
 
-The `cp` step preserves the live orders and admin catalog edits before Git
-restores the tracked seed files. After this migration, application writes go
-to `/opt/campoclaro-data` and no longer block `git pull`.
+The `cp -an` step copies files only if they do not already exist in
+`/opt/campoclaro-data`. This is important: do not use plain `cp -a` here after
+the first migration, because it can overwrite live orders with repository seed
+files. After this migration, application writes go to `/opt/campoclaro-data` and
+no longer block `git pull`.
 
 The explicit `--staged --worktree` options are required if a data file was
 previously staged on the VPS; plain `git restore` only resets the working copy

@@ -110,7 +110,7 @@ export function ProductPage() {
             <div className={`product-main-visual cc-animated-surface ${gallery.length === 0 ? 'cc-product-orbit' : ''}`} style={{
               borderRadius: 8,
               overflow: 'hidden',
-              background: product.gradient,
+              background: '#0d0d0e',
               border: '1px solid rgba(214,178,94,0.1)',
               position: 'relative',
               aspectRatio: '16/9',
@@ -153,7 +153,7 @@ export function ProductPage() {
                           width: 72,
                           height: 72,
                           borderRadius: '50%',
-                          background: `radial-gradient(circle, ${product.glowColor.replace(/[\d.]+\)$/, '0.7)')}, transparent 70%)`,
+                          background: 'rgba(214,178,94,0.12)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -173,7 +173,7 @@ export function ProductPage() {
                             width: 22,
                             height: 22,
                             borderRadius: '50%',
-                            background: 'radial-gradient(circle, rgba(214,178,94,0.4), rgba(240,201,106,0.15))',
+                            background: 'rgba(214,178,94,0.22)',
                           }} />
                         </div>
                       </motion.div>
@@ -247,7 +247,7 @@ export function ProductPage() {
                   style={{
                     flex: 1,
                     height: 36,
-                    background: product.gradient,
+                    background: '#0d0d0e',
                     border: activeVisual === i ? '1px solid rgba(214,178,94,0.5)' : '1px solid rgba(255,255,255,0.06)',
                     borderRadius: 6,
                     cursor: 'pointer',
@@ -523,7 +523,7 @@ export function ProductPage() {
                 style={{
                   width: '100%',
                   padding: '10px 16px',
-                  background: addedFeedback ? 'rgba(214,178,94,0.15)' : 'linear-gradient(135deg, #D6B25E, #F0C96A)',
+                  background: addedFeedback ? 'rgba(214,178,94,0.15)' : '#D6B25E',
                   color: addedFeedback ? '#D6B25E' : '#050505',
                   border: addedFeedback ? '1px solid rgba(214,178,94,0.5)' : 'none',
                   borderRadius: 6,
@@ -603,7 +603,7 @@ export function ProductPage() {
                 overflowY: 'auto',
                 borderRadius: 10,
                 border: '1px solid rgba(214,178,94,0.28)',
-                background: 'linear-gradient(145deg, #0B0B0D 0%, #121017 58%, #050505 100%)',
+                background: '#0b0b0c',
                 boxShadow: '0 28px 90px rgba(0,0,0,0.58), 0 0 44px rgba(214,178,94,0.08)',
               }}
             >
@@ -626,7 +626,7 @@ export function ProductPage() {
               </div>
               <div style={{ padding: 18 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: 14, alignItems: 'center', marginBottom: 16 }}>
-                  <div className={gallery.length === 0 ? 'cc-product-orbit' : ''} style={{ width: 96, height: 96, borderRadius: 8, overflow: 'hidden', background: product.gradient, border: '1px solid rgba(214,178,94,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className={gallery.length === 0 ? 'cc-product-orbit' : ''} style={{ width: 96, height: 96, borderRadius: 8, overflow: 'hidden', background: '#0d0d0e', border: '1px solid rgba(214,178,94,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {activeMedia ? (
                       <ProductMediaPreview image={activeMedia.type === 'image' ? activeMedia.url : undefined} video={activeMedia.type === 'video' ? activeMedia.url : undefined} alt={product.name} />
                     ) : (
@@ -676,7 +676,7 @@ export function ProductPage() {
                 <button
                   type="button"
                   onClick={() => { handleAdd(); setPassportOpen(false) }}
-                  style={{ width: '100%', marginTop: 14, padding: '12px', border: 'none', borderRadius: 6, background: 'linear-gradient(135deg, #D6B25E, #F0C96A)', color: '#050505', cursor: 'pointer', fontFamily: "'Inter', sans-serif", fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}
+                  style={{ width: '100%', marginTop: 14, padding: '12px', border: 'none', borderRadius: 6, background: '#D6B25E', color: '#050505', cursor: 'pointer', fontFamily: "'Inter', sans-serif", fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}
                 >
                   Aggiungi con Passport
                 </button>
@@ -690,7 +690,7 @@ export function ProductPage() {
       <div style={{
         borderTop: '1px solid rgba(255,255,255,0.04)',
         padding: '36px 24px 90px',
-        background: 'linear-gradient(180deg, transparent, rgba(26,16,40,0.08))',
+        background: 'rgba(255,255,255,0.01)',
       }}>
         <div style={{ maxWidth: 1280, margin: '0 auto' }}>
           <div style={{
@@ -715,9 +715,9 @@ export function ProductPage() {
                 <Link to={`/prodotto/${p.id}`} style={{ textDecoration: 'none', display: 'block' }}>
                   <motion.div
                     className="cc-interactive-card cc-animated-surface"
-                    whileHover={{ y: -4, boxShadow: `0 16px 50px ${p.glowColor}` }}
+                    whileHover={{ y: -4, boxShadow: '0 16px 50px rgba(0,0,0,0.38)' }}
                     style={{
-                      background: p.gradient,
+                      background: '#0b0b0c',
                       border: '1px solid rgba(255,255,255,0.05)',
                       borderRadius: 8,
                       padding: '14px',
@@ -731,7 +731,7 @@ export function ProductPage() {
                       width: 48,
                       height: 48,
                       borderRadius: '50%',
-                      background: `radial-gradient(circle, ${p.glowColor.replace(/[\d.]+\)$/, '0.5)')}, transparent)`,
+                      background: 'rgba(214,178,94,0.12)',
                       flexShrink: 0,
                     }} />
                     <div>

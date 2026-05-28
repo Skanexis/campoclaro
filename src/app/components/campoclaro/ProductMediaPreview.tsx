@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type ProductMediaPreviewProps = {
   image?: string
@@ -8,86 +8,59 @@ type ProductMediaPreviewProps = {
   controls?: boolean
 }
 
-function useVideoPoster(video?: string) {
-  const [poster, setPoster] = useState('')
+function useInView() {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    setPoster('')
-    if (!video) return
-
-    let cancelled = false
-    const element = document.createElement('video')
-    element.crossOrigin = 'anonymous'
-    element.muted = true
-    element.playsInline = true
-    element.preload = 'metadata'
-    element.src = video
-
-    const capture = () => {
-      if (cancelled || !element.videoWidth || !element.videoHeight) return
-      try {
-        const canvas = document.createElement('canvas')
-        canvas.width = element.videoWidth
-        canvas.height = element.videoHeight
-        const context = canvas.getContext('2d')
-        if (!context) return
-        context.drawImage(element, 0, 0, canvas.width, canvas.height)
-        setPoster(canvas.toDataURL('image/jpeg', 0.82))
-      } catch {
-        setPoster('')
-      }
+    const element = ref.current
+    if (!element) return
+    if (!('IntersectionObserver' in window)) {
+      setVisible(true)
+      return
     }
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          setVisible(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '240px' },
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
 
-    const seekToFrame = () => {
-      if (cancelled) return
-      try {
-        element.currentTime = Math.min(0.1, Math.max(0, (element.duration || 1) - 0.01))
-      } catch {
-        capture()
-      }
-    }
-
-    element.addEventListener('loadedmetadata', seekToFrame)
-    element.addEventListener('seeked', capture)
-    element.addEventListener('loadeddata', capture)
-    element.load()
-
-    return () => {
-      cancelled = true
-      element.removeEventListener('loadedmetadata', seekToFrame)
-      element.removeEventListener('seeked', capture)
-      element.removeEventListener('loadeddata', capture)
-      element.removeAttribute('src')
-      element.load()
-    }
-  }, [video])
-
-  return poster
+  return { ref, visible }
 }
 
 export function ProductMediaPreview({ image, video, alt, fit = 'cover', controls = false }: ProductMediaPreviewProps) {
-  const poster = useVideoPoster(video)
-  const commonStyle = { width: '100%', height: '100%', objectFit: fit, background: '#050505' } as const
-
-  if (image) {
-    return <img src={image} alt={alt} style={commonStyle} />
-  }
-
-  if (!video) return null
-
-  if (!controls && poster) {
-    return <img src={poster} alt={alt} style={commonStyle} />
-  }
+  const { ref, visible } = useInView()
+  const commonStyle = { width: '100%', height: '100%', objectFit: fit, background: '#050505', display: 'block' } as const
 
   return (
-    <video
-      src={video}
-      poster={poster || undefined}
-      muted={!controls}
-      controls={controls}
-      playsInline
-      preload="metadata"
-      style={commonStyle}
-    />
+    <div ref={ref} style={{ width: '100%', height: '100%', background: '#050505' }}>
+      {image && visible && (
+        <img
+          src={image}
+          alt={alt}
+          loading="lazy"
+          decoding="async"
+          fetchPriority="low"
+          style={commonStyle}
+        />
+      )}
+      {!image && video && visible && (
+        <video
+          src={video}
+          muted={!controls}
+          controls={controls}
+          playsInline
+          preload={controls ? 'metadata' : 'none'}
+          style={commonStyle}
+        />
+      )}
+    </div>
   )
 }

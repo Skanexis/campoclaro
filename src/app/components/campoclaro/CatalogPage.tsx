@@ -64,10 +64,10 @@ function ProductCard({ product }: { product: Product }) {
       className="cc-interactive-card cc-animated-surface"
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
-      animate={{ boxShadow: hovered ? `0 16px 52px ${product.glowColor}` : '0 0 0 transparent' }}
+      animate={{ boxShadow: hovered ? '0 16px 52px rgba(0,0,0,0.38)' : '0 0 0 transparent' }}
       transition={{ duration: 0.3 }}
       style={{
-        background: product.gradient,
+        background: '#0b0b0c',
         border: hovered ? '1px solid rgba(214,178,94,0.2)' : '1px solid rgba(255,255,255,0.05)',
         borderRadius: 8,
         overflow: 'hidden',
@@ -80,7 +80,7 @@ function ProductCard({ product }: { product: Product }) {
         {/* Visual Area */}
         <div className={`catalog-card-visual ${hasMedia ? '' : 'cc-product-orbit'}`} style={{
           height: hovered ? 116 : 146,
-          background: product.gradient,
+          background: '#0d0d0e',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -98,7 +98,7 @@ function ProductCard({ product }: { product: Product }) {
                   width: hovered ? 72 : 88,
                   height: hovered ? 72 : 88,
                   borderRadius: '50%',
-                  background: `radial-gradient(circle, ${product.glowColor.replace(/[\d.]+\)$/, '0.5)')}, transparent 70%)`,
+                  background: 'rgba(214,178,94,0.12)',
                 }}
               />
               <div style={{
@@ -221,7 +221,7 @@ function ProductCard({ product }: { product: Product }) {
           height: 30,
           borderRadius: 6,
           border: '1px solid rgba(214,178,94,0.34)',
-          background: 'linear-gradient(135deg, rgba(214,178,94,0.92), rgba(240,201,106,0.92))',
+          background: '#D6B25E',
           color: '#050505',
           cursor: 'pointer',
           display: 'flex',
@@ -315,7 +315,7 @@ function ProductCard({ product }: { product: Product }) {
                   onClick={handleAdd}
                   style={{
                     padding: '7px 12px',
-                    background: 'linear-gradient(135deg, #D6B25E, #F0C96A)',
+          background: '#D6B25E',
                     color: '#050505',
                     border: 'none',
                     borderRadius: 4,
@@ -369,7 +369,7 @@ export function CatalogPage() {
       <div className="catalog-header" style={{
         padding: '36px 24px 26px',
         borderBottom: '1px solid rgba(255,255,255,0.04)',
-        background: 'linear-gradient(180deg, rgba(26,16,40,0.12), transparent)',
+        background: 'rgba(255,255,255,0.01)',
       }}>
         <div style={{ maxWidth: 1280, margin: '0 auto' }}>
           <motion.div

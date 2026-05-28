@@ -1002,7 +1002,7 @@ export function CartDrawer() {
                   style={{
                     width: '100%',
                     padding: '12px',
-                    background: 'linear-gradient(135deg, #D6B25E, #F0C96A)',
+                    background: '#D6B25E',
                     color: '#050505',
                     border: 'none',
                     borderRadius: 6,

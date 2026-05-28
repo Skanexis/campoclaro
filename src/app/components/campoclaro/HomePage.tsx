@@ -4,6 +4,7 @@ import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react'
 import { ArrowRight, ChevronDown, Star, Shield, Zap, Globe2, MapPin, Truck, CreditCard, PackageCheck } from 'lucide-react'
 import { useProducts } from '../../hooks/useProducts'
 import { useSiteContent } from '../../hooks/useSiteContent'
+import { api } from '../../lib/api'
 
 const REVEAL = {
   initial: { opacity: 0, y: 40 },
@@ -61,12 +62,7 @@ function IntroScreen({ onComplete }: { onComplete: () => void }) {
           fontWeight: 700,
           letterSpacing: '0.3em',
           textTransform: 'uppercase',
-          background: 'linear-gradient(90deg, #D6B25E 0%, #F0C96A 30%, #FFFDE7 50%, #F0C96A 70%, #D6B25E 100%)',
-          backgroundSize: '200% auto',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          animation: 'shimmerGold 3s linear infinite',
+          color: '#D6B25E',
         }}
       >
         CAMPOCLARO
@@ -78,7 +74,7 @@ function IntroScreen({ onComplete }: { onComplete: () => void }) {
         style={{
           width: 60,
           height: 1,
-          background: 'linear-gradient(90deg, transparent, #D6B25E, transparent)',
+          background: '#D6B25E',
         }}
       />
       <motion.p
@@ -104,6 +100,7 @@ export function HomePage() {
   const siteContent = useSiteContent()
   const [introPlayed, setIntroPlayed] = useState(() => sessionStorage.getItem('cc-intro') === '1')
   const [showIntro, setShowIntro] = useState(!introPlayed)
+  const [customerSignedIn, setCustomerSignedIn] = useState<boolean | null>(null)
   const heroRef = useRef<HTMLDivElement>(null)
   const { scrollY } = useScroll()
   const heroOpacity = useTransform(scrollY, [0, 400], [1, 0])
@@ -114,6 +111,20 @@ export function HomePage() {
     setShowIntro(false)
     setIntroPlayed(true)
   }
+
+  useEffect(() => {
+    let cancelled = false
+    api.customerMe()
+      .then(result => {
+        if (!cancelled) setCustomerSignedIn(Boolean(result.user))
+      })
+      .catch(() => {
+        if (!cancelled) setCustomerSignedIn(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   return (
     <>
@@ -143,26 +154,17 @@ export function HomePage() {
             padding: '120px 24px 80px',
           }}
         >
-          {/* Background gradients */}
+          {/* Background */}
           <div style={{
             position: 'absolute',
             inset: 0,
-            background: `
-              radial-gradient(ellipse 80% 60% at 50% 100%, rgba(214,178,94,0.06) 0%, transparent 60%),
-              radial-gradient(ellipse 60% 50% at 20% 20%, rgba(26,16,40,0.5) 0%, transparent 50%),
-              radial-gradient(ellipse 50% 40% at 80% 80%, rgba(10,15,31,0.4) 0%, transparent 50%),
-              #050505
-            `,
+            background: '#050505',
           }} />
 
-          {/* Light streaks */}
           <div style={{
             position: 'absolute',
             inset: 0,
-            background: `
-              linear-gradient(135deg, transparent 30%, rgba(214,178,94,0.015) 50%, transparent 70%),
-              linear-gradient(225deg, transparent 30%, rgba(240,201,106,0.01) 50%, transparent 70%)
-            `,
+            background: 'transparent',
           }} />
 
           <motion.div
@@ -206,10 +208,7 @@ export function HomePage() {
             >
               Accesso riservato.{' '}
               <span style={{
-                background: 'linear-gradient(135deg, #D6B25E, #F0C96A)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
+                color: '#D6B25E',
               }}>
                 Qualità
               </span>
@@ -246,7 +245,7 @@ export function HomePage() {
                   whileTap={{ scale: 0.97 }}
                   style={{
                     padding: '14px 32px',
-                    background: 'linear-gradient(135deg, #D6B25E, #F0C96A)',
+                    background: '#D6B25E',
                     color: '#050505',
                     border: 'none',
                     borderRadius: 4,
@@ -266,28 +265,30 @@ export function HomePage() {
                 </motion.button>
               </Link>
 
-              <Link to="/profilo" style={{ textDecoration: 'none' }}>
-                <motion.button
-                  whileHover={{ scale: 1.03, borderColor: 'rgba(214,178,94,0.5)' }}
-                  whileTap={{ scale: 0.97 }}
-                  style={{
-                    padding: '14px 32px',
-                    background: 'transparent',
-                    color: 'rgba(245,245,245,0.7)',
-                    border: '1px solid rgba(245,245,245,0.15)',
-                    borderRadius: 4,
-                    fontFamily: "'Inter', sans-serif",
-                    fontSize: '0.8rem',
-                    fontWeight: 500,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    cursor: 'pointer',
-                    transition: 'border-color 0.2s',
-                  }}
-                >
-                  Accedi
-                </motion.button>
-              </Link>
+              {customerSignedIn === false && (
+                <Link to="/profilo" style={{ textDecoration: 'none' }}>
+                  <motion.button
+                    whileHover={{ scale: 1.03, borderColor: 'rgba(214,178,94,0.5)' }}
+                    whileTap={{ scale: 0.97 }}
+                    style={{
+                      padding: '14px 32px',
+                      background: 'transparent',
+                      color: 'rgba(245,245,245,0.7)',
+                      border: '1px solid rgba(245,245,245,0.15)',
+                      borderRadius: 4,
+                      fontFamily: "'Inter', sans-serif",
+                      fontSize: '0.8rem',
+                      fontWeight: 500,
+                      letterSpacing: '0.1em',
+                      textTransform: 'uppercase',
+                      cursor: 'pointer',
+                      transition: 'border-color 0.2s',
+                    }}
+                  >
+                    Accedi
+                  </motion.button>
+                </Link>
+              )}
             </motion.div>
           </motion.div>
 
@@ -435,7 +436,7 @@ export function HomePage() {
                       style={{
                         minHeight: 132,
                         padding: 18,
-                        background: 'linear-gradient(135deg, rgba(255,255,255,0.035), rgba(214,178,94,0.035))',
+                        background: '#0b0b0c',
                         border: '1px solid rgba(255,255,255,0.07)',
                         borderRadius: 8,
                       }}
@@ -473,7 +474,7 @@ export function HomePage() {
           style={{
             padding: '100px 24px',
             borderTop: '1px solid rgba(255,255,255,0.04)',
-            background: 'linear-gradient(180deg, transparent, rgba(26,16,40,0.2), transparent)',
+            background: '#050505',
           }}
         >
           <div style={{ maxWidth: 680, margin: '0 auto', textAlign: 'center' }}>
@@ -493,7 +494,7 @@ export function HomePage() {
               marginTop: 32,
               width: 40,
               height: 1,
-              background: 'linear-gradient(90deg, transparent, #D6B25E, transparent)',
+              background: '#D6B25E',
               margin: '32px auto 0',
             }} />
           </div>
@@ -515,10 +516,7 @@ export function HomePage() {
             fontWeight: 700,
             letterSpacing: '0.2em',
             textTransform: 'uppercase',
-            background: 'linear-gradient(135deg, #D6B25E, #F0C96A)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
+            color: '#D6B25E',
           }}>
             CAMPOCLARO
           </div>

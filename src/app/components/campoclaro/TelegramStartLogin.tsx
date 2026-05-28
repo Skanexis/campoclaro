@@ -111,7 +111,7 @@ export function TelegramStartLogin({
           Attendo /start nel bot...
         </button>
       ) : preparedLogin ? (
-        <a href={preparedLogin.botUrl} target="_blank" rel="noopener noreferrer" onClick={activateLogin} style={{ boxSizing: 'border-box', width: compact ? 'auto' : '100%', minHeight: compact ? 36 : 44, padding: compact ? '8px 13px' : '12px 16px', borderRadius: 6, border: '1px solid rgba(214,178,94,0.35)', background: 'linear-gradient(135deg, #D6B25E, #F0C96A)', color: '#050505', fontFamily: "'Inter', sans-serif", fontSize: compact ? '0.74rem' : '0.82rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+        <a href={preparedLogin.botUrl} target="_blank" rel="noopener noreferrer" onClick={activateLogin} style={{ boxSizing: 'border-box', width: compact ? 'auto' : '100%', minHeight: compact ? 36 : 44, padding: compact ? '8px 13px' : '12px 16px', borderRadius: 6, border: '1px solid rgba(214,178,94,0.35)', background: '#D6B25E', color: '#050505', fontFamily: "'Inter', sans-serif", fontSize: compact ? '0.74rem' : '0.82rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
           Accedi tramite bot
         </a>
       ) : (

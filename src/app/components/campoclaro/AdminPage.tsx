@@ -3,11 +3,11 @@ import type { CSSProperties, ReactNode, Ref } from 'react'
 import { motion } from 'motion/react'
 import { BarChart3, Check, Crown, ExternalLink, Film, ImageIcon, LogOut, Mail, Package, Save, Send, ShoppingBag, Trash2, Upload, UserCheck, X } from 'lucide-react'
 import { Product } from './data'
-import { api, Order, SiteContent } from '../../lib/api'
+import { api, Order, SiteContent, type AdminCustomer } from '../../lib/api'
 import { FALLBACK_SITE_CONTENT } from '../../hooks/useSiteContent'
 import { TelegramStartLogin } from './TelegramStartLogin'
 
-type AdminTab = 'orders' | 'products' | 'circle' | 'filters' | 'contacts' | 'newsletter'
+type AdminTab = 'orders' | 'products' | 'users' | 'circle' | 'filters' | 'contacts' | 'newsletter'
 type ProductMediaKey = 'images' | 'videos'
 const MEDIA_MAX_BYTES: Record<ProductMediaKey, number> = {
   images: 15 * 1024 * 1024,
@@ -31,7 +31,7 @@ const EMPTY_PRODUCT: Product & { active?: boolean; originalId?: string } = {
   thc: '',
   cbd: '',
   tags: [],
-  gradient: 'linear-gradient(135deg, #1a1028 0%, #0a0f1f 60%, #050505 100%)',
+  gradient: '#0d0d0e',
   glowColor: 'rgba(214,178,94,0.12)',
   circleMinLevel: '',
   circleScoreBoost: 0,
@@ -64,42 +64,42 @@ function parseCommaList(value: string) {
 const PRODUCT_PRESETS = [
   {
     label: 'Ice',
-    gradient: 'linear-gradient(135deg, #071522 0%, #12384a 58%, #030608 100%)',
+    gradient: '#0d1114',
     glowColor: 'rgba(120,205,240,0.16)',
   },
   {
     label: 'Gold',
-    gradient: 'linear-gradient(135deg, #1b1208 0%, #2d1d0c 58%, #080504 100%)',
+    gradient: '#15130d',
     glowColor: 'rgba(240,201,106,0.18)',
   },
   {
     label: 'Green',
-    gradient: 'linear-gradient(135deg, #061912 0%, #123525 58%, #030806 100%)',
+    gradient: '#0d1411',
     glowColor: 'rgba(126,220,164,0.14)',
   },
   {
     label: 'Noir',
-    gradient: 'linear-gradient(135deg, #08080a 0%, #17131d 55%, #030304 100%)',
+    gradient: '#0d0d0e',
     glowColor: 'rgba(214,178,94,0.12)',
   },
   {
     label: 'Ruby',
-    gradient: 'linear-gradient(135deg, #1b0609 0%, #351019 58%, #070203 100%)',
+    gradient: '#140d0f',
     glowColor: 'rgba(235,88,112,0.14)',
   },
   {
     label: 'Violet',
-    gradient: 'linear-gradient(135deg, #120820 0%, #281640 58%, #050209 100%)',
+    gradient: '#100d14',
     glowColor: 'rgba(170,126,235,0.14)',
   },
   {
     label: 'Citrus',
-    gradient: 'linear-gradient(135deg, #151302 0%, #313107 58%, #050500 100%)',
+    gradient: '#14140d',
     glowColor: 'rgba(220,218,93,0.14)',
   },
   {
     label: 'Ocean',
-    gradient: 'linear-gradient(135deg, #03141a 0%, #0f3140 58%, #020608 100%)',
+    gradient: '#0d1214',
     glowColor: 'rgba(91,205,235,0.14)',
   },
 ]
@@ -129,10 +129,10 @@ const STATUS_STYLES: Record<string, { color: string; bg: string; border: string 
 }
 
 const panel: CSSProperties = {
-  background: 'linear-gradient(145deg, rgba(255,255,255,0.052), rgba(255,255,255,0.018) 52%, rgba(38,178,165,0.028))',
+  background: '#0b0b0c',
   border: '1px solid rgba(255,255,255,0.1)',
   borderRadius: 8,
-  boxShadow: '0 18px 60px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.055)',
+  boxShadow: '0 14px 44px rgba(0,0,0,0.28)',
 }
 
 function Field({
@@ -151,7 +151,7 @@ function Field({
   const common: CSSProperties = {
     width: '100%',
     boxSizing: 'border-box',
-    background: 'linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.026))',
+    background: '#101011',
     border: '1px solid rgba(255,255,255,0.12)',
     borderRadius: 6,
     color: '#F5F5F5',
@@ -445,8 +445,9 @@ export function AdminPage() {
   const [checking, setChecking] = useState(true)
   const [authorized, setAuthorized] = useState(false)
   const [tab, setTab] = useState<AdminTab>('orders')
-  const [stats, setStats] = useState({ products: 0, orders: 0, revenue: 0, pending: 0, newsletterSubscribers: 0 })
+  const [stats, setStats] = useState({ products: 0, orders: 0, revenue: 0, pending: 0, newsletterSubscribers: 0, customers: 0 })
   const [orders, setOrders] = useState<Order[]>([])
+  const [customers, setCustomers] = useState<AdminCustomer[]>([])
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, string>>({})
   const [products, setProducts] = useState<(Product & { active?: boolean })[]>([])
   const [siteContent, setSiteContent] = useState<SiteContent>(FALLBACK_SITE_CONTENT)
@@ -464,9 +465,10 @@ export function AdminPage() {
   const productNameRef = useRef<HTMLInputElement>(null)
 
   const loadAdmin = async () => {
-    const [statsData, orderData, productData, contentData] = await Promise.all([api.adminStats(), api.adminOrders(), api.adminProducts(), api.adminSiteContent()])
+    const [statsData, orderData, customerData, productData, contentData] = await Promise.all([api.adminStats(), api.adminOrders(), api.adminCustomers(), api.adminProducts(), api.adminSiteContent()])
     setStats(statsData)
     setOrders(orderData)
+    setCustomers(customerData)
     setTrackingDrafts(Object.fromEntries(orderData.map(order => [order.id, order.trackingNumber || ''])))
     setProducts(productData)
     setSiteContent(contentData)
@@ -735,9 +737,9 @@ export function AdminPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 22 }} className="admin-stats">
           {[
             { icon: <ShoppingBag size={18} />, label: 'Ordini', value: stats.orders },
+            { icon: <UserCheck size={18} />, label: 'Utenti', value: stats.customers || customers.length },
             { icon: <Package size={18} />, label: 'Prodotti', value: stats.products },
             { icon: <BarChart3 size={18} />, label: 'Ricavi', value: `€${stats.revenue}` },
-            { icon: <Mail size={18} />, label: 'Newsletter', value: stats.newsletterSubscribers || 0 },
           ].map(item => (
             <div key={item.label} className="admin-stat-card" style={{ ...panel, padding: 18 }}>
               <div style={{ color: '#D6B25E', marginBottom: 12 }}>{item.icon}</div>
@@ -751,6 +753,7 @@ export function AdminPage() {
           {[
             { id: 'orders', label: 'Ordini' },
             { id: 'products', label: 'Catalogo' },
+            { id: 'users', label: 'Utenti' },
             { id: 'circle', label: 'Circle' },
             { id: 'filters', label: 'Filtri' },
             { id: 'contacts', label: 'Contatti' },
@@ -1180,9 +1183,9 @@ export function AdminPage() {
                         {(editing[media.key] || []).map(url => (
                           <div key={url} style={{ position: 'relative', height: 88, overflow: 'hidden', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: '#08080a' }}>
                             {media.key === 'images' ? (
-                              <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <img src={url} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
-                              <video src={url} muted playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <video src={url} muted playsInline preload="none" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             )}
                             <button type="button" title="Rimuovi" onClick={() => removeProductMedia(media.key, url)} style={{ position: 'absolute', top: 5, right: 5, width: 24, height: 24, borderRadius: 12, border: '1px solid rgba(229,115,115,0.35)', background: 'rgba(5,5,5,0.8)', color: '#E57373', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                               <X size={12} />
@@ -1193,7 +1196,7 @@ export function AdminPage() {
                     )}
                   </div>
                 ))}
-                <div className="admin-form-block-wide" style={{ ...panel, padding: 14, background: editing.gradient }}>
+                <div className="admin-form-block-wide" style={{ ...panel, padding: 14, background: '#0d0d0e' }}>
                   <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, color: '#F5F5F5', marginBottom: 8 }}>{editing.name || 'Preview prodotto'}</div>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
                     {editing.tags.map(tag => tag.trim()).filter(Boolean).slice(0, 2).map(tag => (
@@ -1204,7 +1207,7 @@ export function AdminPage() {
                 </div>
               </div>
               <div className="admin-product-actions" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 18 }}>
-                <button disabled={Boolean(mediaUploading)} onClick={saveProduct} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: 'linear-gradient(135deg, #D6B25E, #F0C96A)', color: '#050505', border: 'none', borderRadius: 6, fontWeight: 700, cursor: mediaUploading ? 'wait' : 'pointer', opacity: mediaUploading ? 0.65 : 1 }}>
+                <button disabled={Boolean(mediaUploading)} onClick={saveProduct} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: '#D6B25E', color: '#050505', border: 'none', borderRadius: 6, fontWeight: 700, cursor: mediaUploading ? 'wait' : 'pointer', opacity: mediaUploading ? 0.65 : 1 }}>
                   <Save size={16} /> {mediaUploading ? 'Caricamento...' : 'Salva'}
                 </button>
                 {editing.id && (
@@ -1216,6 +1219,71 @@ export function AdminPage() {
               {message && <div style={{ marginTop: 14, color: '#D6B25E', fontFamily: "'Inter', sans-serif", fontSize: '0.8rem' }}>{message}</div>}
             </div>
             </div>
+          </motion.div>
+        )}
+
+        {tab === 'users' && (
+          <motion.div className="admin-list" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ ...panel, overflow: 'visible' }}>
+            <AdminPanelHeader
+              eyebrow="Clienti"
+              title="Utenti"
+              meta={[
+                { label: 'totali', value: customers.length },
+                { label: 'newsletter', value: customers.filter(customer => customer.newsletterEnabled).length },
+                { label: 'con ordini', value: customers.filter(customer => customer.ordersCount > 0).length },
+              ]}
+            />
+            {customers.length === 0 ? (
+              <div className="admin-empty-state" style={{ padding: 32, color: 'rgba(245,245,245,0.38)', fontFamily: "'Inter', sans-serif" }}>
+                Nessun utente trovato.
+              </div>
+            ) : (
+              <div className="admin-users-grid" style={{ display: 'grid', gap: 10, padding: 14 }}>
+                {customers.map(customer => {
+                  const displayName = [customer.firstName, customer.lastName].filter(Boolean).join(' ').trim() || customer.username || 'Utente'
+                  return (
+                    <article key={customer.id} className="admin-user-card" style={{ ...panel, padding: 14 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 0.8fr 1fr', gap: 12, alignItems: 'center' }} className="admin-user-row">
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 800, color: '#F5F5F5', marginBottom: 4, overflowWrap: 'anywhere' }}>
+                            {displayName}
+                          </div>
+                          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.42)', overflowWrap: 'anywhere' }}>
+                            {customer.username ? `@${customer.username}` : 'Username non disponibile'}
+                          </div>
+                          <div style={{ marginTop: 4, fontFamily: "'JetBrains Mono', monospace", fontSize: '0.68rem', color: 'rgba(245,245,245,0.32)', overflowWrap: 'anywhere' }}>
+                            ID {customer.id}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="admin-order-label">Ordini</div>
+                          <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#D6B25E', fontWeight: 800 }}>
+                            {customer.ordersCount}
+                          </div>
+                          <div className="admin-order-muted">{customer.completedOrders} completati</div>
+                        </div>
+                        <div>
+                          <div className="admin-order-label">Totale</div>
+                          <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#D6B25E', fontWeight: 800 }}>
+                            €{customer.totalSpent}
+                          </div>
+                          <div className="admin-order-muted">{customer.newsletterEnabled ? 'Newsletter ON' : 'Newsletter OFF'}</div>
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div className="admin-order-label">Ultimo ordine</div>
+                          <div style={{ fontFamily: "'Inter', sans-serif", color: 'rgba(245,245,245,0.68)', fontSize: '0.78rem', overflowWrap: 'anywhere' }}>
+                            {customer.lastOrderId || '-'}
+                          </div>
+                          <div className="admin-order-muted">
+                            {customer.lastOrderAt ? new Date(customer.lastOrderAt).toLocaleString('it-IT') : 'Nessun ordine'}
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -1267,9 +1335,9 @@ export function AdminPage() {
             </div>
             <div style={{ display: 'grid', gap: 12 }}>
               {siteContent.circle.levels.map((level, index) => (
-                <div key={`${level.id}-${index}`} style={{ ...panel, padding: 14 }}>
+                <div key={`circle-level-${index}`} className="admin-circle-level-card" style={{ ...panel, padding: 14 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px auto', gap: 12, alignItems: 'end' }} className="admin-form">
-                    <Field label="Nome livello" value={level.label} onChange={value => updateCircleLevel(index, { label: value, id: value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || level.id })} />
+                    <Field label="Nome livello" value={level.label} onChange={value => updateCircleLevel(index, { label: value })} />
                     <Field label="Score minimo" value={String(level.minScore)} onChange={value => updateCircleLevel(index, { minScore: Number(value) || 0 })} />
                     <button
                       type="button"
@@ -1296,7 +1364,7 @@ export function AdminPage() {
               ))}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 18 }}>
-              <button onClick={saveSiteContent} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: 'linear-gradient(135deg, #D6B25E, #F0C96A)', color: '#050505', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={saveSiteContent} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: '#D6B25E', color: '#050505', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>
                 <Save size={16} /> Salva Circle
               </button>
               {message && <div style={{ color: '#D6B25E', fontFamily: "'Inter', sans-serif", fontSize: '0.8rem' }}>{message}</div>}
@@ -1338,7 +1406,7 @@ export function AdminPage() {
               ))}
             </div>
 
-            <button onClick={saveSiteContent} style={{ marginTop: 18, display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: 'linear-gradient(135deg, #D6B25E, #F0C96A)', color: '#050505', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={saveSiteContent} style={{ marginTop: 18, display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: '#D6B25E', color: '#050505', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>
               <Save size={16} /> Salva filtri
             </button>
             {message && <div style={{ marginTop: 14, color: '#D6B25E', fontFamily: "'Inter', sans-serif", fontSize: '0.8rem' }}>{message}</div>}
@@ -1436,7 +1504,7 @@ export function AdminPage() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 18 }}>
-              <button onClick={saveSiteContent} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: 'linear-gradient(135deg, #D6B25E, #F0C96A)', color: '#050505', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={saveSiteContent} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 18px', background: '#D6B25E', color: '#050505', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>
                 <Save size={16} /> Salva contatti
               </button>
               {message && <div style={{ color: '#D6B25E', fontFamily: "'Inter', sans-serif", fontSize: '0.8rem' }}>{message}</div>}
@@ -1470,7 +1538,7 @@ export function AdminPage() {
                     alignItems: 'center',
                     gap: 8,
                     padding: '12px 18px',
-                    background: 'linear-gradient(135deg, #D6B25E, #F0C96A)',
+                    background: '#D6B25E',
                     color: '#050505',
                     border: 'none',
                     borderRadius: 6,
@@ -1623,6 +1691,25 @@ export function AdminPage() {
           font-size: 0.62rem;
         }
         .admin-form-panel {
+          min-width: 0;
+          max-width: 100%;
+          overflow-wrap: anywhere;
+        }
+        .admin-form-block,
+        .admin-order-card,
+        .admin-user-card,
+        .admin-contact-card,
+        .admin-circle-level-card,
+        .admin-product-item,
+        .admin-panel-header,
+        .admin-order-info-card {
+          min-width: 0;
+          max-width: 100%;
+          overflow-wrap: anywhere;
+        }
+        .admin-form-block *,
+        .admin-form-panel *,
+        .admin-order-card * {
           min-width: 0;
         }
         .admin-form-panel:focus-within {
@@ -1891,7 +1978,7 @@ export function AdminPage() {
           }
           .admin-form-block textarea,
           .admin-form-panel textarea {
-            rows: 3;
+            min-height: 74px !important;
           }
           .admin-catalog-view {
             display: grid;
@@ -1901,17 +1988,17 @@ export function AdminPage() {
             gap: 8px !important;
           }
           .admin-product-list {
-            max-height: 28vh !important;
-            position: sticky !important;
-            top: 142px;
-            z-index: 50;
+            max-height: none !important;
+            position: static !important;
+            z-index: auto;
           }
           .admin-list-title {
             padding: 8px 10px;
             font-size: 0.58rem;
           }
           .admin-product-list-scroll {
-            max-height: calc(28vh - 38px);
+            max-height: 34vh;
+            overscroll-behavior: contain;
           }
           .admin-product-item {
             padding: 9px 10px !important;
@@ -1962,7 +2049,7 @@ export function AdminPage() {
           }
           .admin-product-actions {
             position: sticky;
-            bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+            bottom: 0;
             z-index: 60;
             margin: 10px -12px -12px !important;
             padding: 8px 12px;
@@ -1985,6 +2072,21 @@ export function AdminPage() {
           .admin-orders-grid {
             padding: 6px !important;
             gap: 6px !important;
+          }
+          .admin-users-grid {
+            padding: 6px !important;
+            gap: 6px !important;
+          }
+          .admin-user-card {
+            padding: 9px !important;
+          }
+          .admin-user-row {
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px !important;
+          }
+          .admin-user-row > div:first-child,
+          .admin-user-row > div:last-child {
+            grid-column: 1 / -1;
           }
           .admin-order-card {
             padding: 8px !important;

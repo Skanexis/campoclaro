@@ -1237,13 +1237,72 @@ app.get('/api/auth/me', (req, res) => {
 
 app.get('/api/admin/stats', requireAdmin, async (_req, res) => {
   const [products, orders, subscribers] = await Promise.all([readJson(productsFile, []), readJson(ordersFile, []), readJson(newsletterSubscribersFile, [])])
+  const customerIds = new Set([
+    ...orders.map(order => String(order.customer?.id || '')).filter(Boolean),
+    ...subscribers.map(subscriber => String(subscriber.id || '')).filter(Boolean),
+  ])
   res.json({
     products: products.length,
     orders: orders.length,
     revenue: orders.reduce((sum, order) => sum + Number(order.total || 0), 0),
     pending: orders.filter(order => ['new', 'processing'].includes(order.status)).length,
     newsletterSubscribers: subscribers.filter(item => item.enabled === true).length,
+    customers: customerIds.size,
   })
+})
+
+app.get('/api/admin/customers', requireAdmin, async (_req, res) => {
+  const [orders, subscribers] = await Promise.all([readJson(ordersFile, []), readJson(newsletterSubscribersFile, [])])
+  const customers = new Map()
+  const ensureCustomer = customer => {
+    const id = String(customer?.id || '').trim()
+    if (!id) return null
+    if (!customers.has(id)) {
+      customers.set(id, {
+        id,
+        firstName: '',
+        lastName: '',
+        username: '',
+        newsletterEnabled: false,
+        ordersCount: 0,
+        completedOrders: 0,
+        totalSpent: 0,
+        lastOrderAt: '',
+        lastOrderId: '',
+        lastOrderStatus: '',
+        firstSeenAt: '',
+      })
+    }
+    const record = customers.get(id)
+    record.firstName = record.firstName || String(customer.firstName || '')
+    record.lastName = record.lastName || String(customer.lastName || '')
+    record.username = record.username || String(customer.username || '')
+    return record
+  }
+
+  for (const subscriber of subscribers) {
+    const record = ensureCustomer(subscriber)
+    if (!record) continue
+    record.newsletterEnabled = subscriber.enabled === true
+    record.firstSeenAt = record.firstSeenAt || subscriber.updatedAt || ''
+  }
+
+  for (const order of orders) {
+    const record = ensureCustomer(order.customer)
+    if (!record) continue
+    record.ordersCount += 1
+    if (order.status === 'completed') record.completedOrders += 1
+    record.totalSpent += Number(order.total || 0)
+    const createdAt = String(order.createdAt || '')
+    if (!record.firstSeenAt || (createdAt && createdAt < record.firstSeenAt)) record.firstSeenAt = createdAt
+    if (!record.lastOrderAt || (createdAt && createdAt > record.lastOrderAt)) {
+      record.lastOrderAt = createdAt
+      record.lastOrderId = String(order.id || '')
+      record.lastOrderStatus = String(order.status || '')
+    }
+  }
+
+  res.json([...customers.values()].sort((a, b) => String(b.lastOrderAt || b.firstSeenAt).localeCompare(String(a.lastOrderAt || a.firstSeenAt))))
 })
 
 app.get('/api/admin/products', requireAdmin, async (_req, res) => {
@@ -1542,8 +1601,18 @@ app.use((error, _req, res, next) => {
   return next(error)
 })
 
-app.use(express.static(publicDir))
-app.use('/media', express.static(mediaDir))
+app.use(express.static(publicDir, {
+  maxAge: '1h',
+  setHeaders: (res, filePath) => {
+    if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+    }
+  },
+}))
+app.use('/media', express.static(mediaDir, {
+  maxAge: '30d',
+  immutable: true,
+}))
 
 app.get(/^\/(?!api\/).*/, (_req, res) => {
   res.sendFile(path.join(publicDir, 'index.html'))
