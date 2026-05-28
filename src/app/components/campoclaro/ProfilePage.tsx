@@ -849,12 +849,12 @@ export function ProfilePage() {
                     </div>
                     <div style={{ padding: 14, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                       <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 800, color: '#F5F5F5', marginBottom: 8 }}>
-                        Come salire
+                        Как повысить уровень
                       </div>
                       {[
-                        orders.length === 0 ? `Primo ordine +${siteContent.circle.orderCompletedPoints} XP` : 'Ordini completati aumentano il livello',
-                        'Pagamenti verificati aumentano la fiducia',
-                        notificationsEnabled ? 'Notifiche attive' : 'Attiva notifiche per sbloccare XP',
+                        'Приглашай друзей',
+                        'Делай заказы',
+                        'Оплачивай заказы с помощью крипты',
                       ].map(item => (
                         <div key={item} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', color: 'rgba(245,245,245,0.48)', fontSize: '0.76rem' }}>
                           {item}
