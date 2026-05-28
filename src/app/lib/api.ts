@@ -221,6 +221,7 @@ export const api = {
   adminOrders: () => request<Order[]>('/api/admin/orders'),
   updateOrderStatus: (id: string, status: string) =>
     request<Order>(`/api/admin/orders/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  deleteOrder: (id: string) => request<{ ok: boolean }>(`/api/admin/orders/${id}`, { method: 'DELETE' }),
   updateOrderTracking: (id: string, trackingNumber: string, trackingProvider = 'Auto Free') =>
     request<Order>(`/api/admin/orders/${id}`, { method: 'PATCH', body: JSON.stringify({ trackingNumber, trackingProvider }) }),
   sendNewsletter: (title: string, body: string) =>

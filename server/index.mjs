@@ -897,6 +897,10 @@ function normalizeSiteContent(input = {}) {
   const circleInput = input.circle && typeof input.circle === 'object' ? input.circle : defaultSiteContent.circle
   const defaultEarlyDropLevels = new Set(defaultSiteContent.circle.levels.filter(level => level.earlyDropAccess).map(level => level.id))
   const defaultFreeDeliveryLevels = new Set(defaultSiteContent.circle.levels.filter(level => level.freeDeliveryAccess).map(level => level.id))
+  const defaultMeetupDiscountByLevel = new Map(defaultSiteContent.circle.levels.map(level => [
+    level.id,
+    safePercent(level.meetupDepositDiscountPct),
+  ]))
   const circleLevels = Array.isArray(circleInput.levels)
     ? circleInput.levels.map((level, index) => {
       const id = String(level.id || level.label || `level-${index + 1}`).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `level-${index + 1}`
@@ -910,7 +914,9 @@ function normalizeSiteContent(input = {}) {
         perks,
         earlyDropAccess: level.earlyDropAccess === true || (level.earlyDropAccess === undefined && (defaultEarlyDropLevels.has(id) || perks.some(perk => /early\s*drop|accesso\s*anticipato/i.test(perk)))),
         freeDeliveryAccess: level.freeDeliveryAccess === true || (level.freeDeliveryAccess === undefined && (defaultFreeDeliveryLevels.has(id) || perks.some(perk => /free\s*(delivery|shipping)|spedizione\s*gratis|delivery\s*gratuita/i.test(perk)))),
-        meetupDepositDiscountPct: safePercent(level.meetupDepositDiscountPct),
+        meetupDepositDiscountPct: level.meetupDepositDiscountPct !== undefined
+          ? safePercent(level.meetupDepositDiscountPct)
+          : Number(defaultMeetupDiscountByLevel.get(id) || 0),
       }
     }).filter(level => level.label)
     : defaultSiteContent.circle.levels
@@ -1245,6 +1251,7 @@ async function applyAdminOrderAction(orderId, action) {
 
   if (action === 'paid') {
     order.paymentStatus = 'paid_confirmed'
+    order.cryptoPaidAt = new Date().toISOString()
     if (order.payment === 'crypto') {
       order.cryptoPaidAmount = order.cryptoExpectedAmount || order.cryptoPaidAmount || ''
       order.cryptoPaidEur = Number(order.paymentDueEur ?? order.total ?? 0)
@@ -1254,6 +1261,22 @@ async function applyAdminOrderAction(orderId, action) {
     if (order.status === 'new') order.status = 'processing'
   } else if (['new', 'processing', 'shipped', 'completed', 'cancelled'].includes(action)) {
     order.status = action
+    if (action === 'processing' && order.delivery === 'meetup' && order.paymentStatus !== 'paid_confirmed') {
+      // Admin approval for meetup forcibly settles the required deposit.
+      order.paymentStatus = 'paid_confirmed'
+      order.cryptoPaidAt = new Date().toISOString()
+      if (order.payment === 'crypto') {
+        order.cryptoPaidAmount = order.cryptoExpectedAmount || order.cryptoPaidAmount || ''
+        order.cryptoPaidEur = Number(order.paymentDueEur ?? order.total ?? 0)
+        order.cryptoRemainingAmount = cryptoAmountForOrder(0, order)
+        order.cryptoRemainingEur = 0
+      }
+    }
+    if (action === 'processing' && order.delivery === 'meetup') {
+      // "Approvato" meetup should count as completed for Circle/profile stats.
+      order.status = 'completed'
+      if (!order.deliveredAt) order.deliveredAt = new Date().toISOString()
+    }
     if (action === 'shipped' && !order.shippedAt) order.shippedAt = new Date().toISOString()
     if (action === 'completed' && !order.deliveredAt) order.deliveredAt = new Date().toISOString()
   } else {
@@ -1961,6 +1984,15 @@ app.patch('/api/admin/orders/:id', requireAdmin, async (req, res) => {
     await notifyCustomerOrderUpdate(order, 'shipped')
   }
   res.json(order)
+})
+
+app.delete('/api/admin/orders/:id', requireAdmin, async (req, res) => {
+  const orders = await readJson(ordersFile, [])
+  const index = orders.findIndex(item => item.id === req.params.id)
+  if (index === -1) return res.status(404).json({ error: 'Order not found' })
+  orders.splice(index, 1)
+  await writeJson(ordersFile, orders)
+  res.json({ ok: true })
 })
 
 app.post('/api/telegram/webhook', async (req, res) => {

@@ -679,6 +679,18 @@ export function AdminPage() {
     await loadAdmin()
   }
 
+  const deleteOrder = async (id: string) => {
+    if (!window.confirm(`Eliminare definitivamente ordine ${id}?`)) return
+    setMessage('')
+    try {
+      await api.deleteOrder(id)
+      setMessage(`Ordine ${id} eliminato.`)
+      await loadAdmin()
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Eliminazione ordine non riuscita')
+    }
+  }
+
   const saveOrderTracking = async (id: string) => {
     await api.updateOrderTracking(id, trackingDrafts[id] || '')
     await loadAdmin()
@@ -969,6 +981,14 @@ export function AdminPage() {
                             <button type="button" title="Annulla" onClick={() => quickOrderStatus(order.id, 'cancelled')} style={{ width: 36, height: 36, borderRadius: 6, border: '1px solid rgba(229,115,115,0.28)', background: 'rgba(229,115,115,0.1)', color: '#E57373', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
                           </>
                         )}
+                        <button
+                          type="button"
+                          title="Elimina ordine"
+                          onClick={() => deleteOrder(order.id)}
+                          style={{ width: 36, height: 36, borderRadius: 6, border: '1px solid rgba(229,115,115,0.28)', background: 'rgba(229,115,115,0.1)', color: '#E57373', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </footer>
                     </article>
                   )
