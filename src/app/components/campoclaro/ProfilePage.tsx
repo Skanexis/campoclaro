@@ -2,12 +2,13 @@ import { type ReactElement, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { motion, AnimatePresence } from 'motion/react'
 import { QRCodeSVG } from 'qrcode.react'
-import { User, Package, Settings, ChevronRight, Clock, Check, Truck, Shield, LogOut, Fingerprint, Copy, LockKeyhole, Crown, Sparkles, ArrowLeft } from 'lucide-react'
+import { User, Package, Settings, ChevronRight, Clock, Check, Truck, Shield, LogOut, Fingerprint, Copy, LockKeyhole, Crown, Sparkles, ArrowLeft, RotateCcw } from 'lucide-react'
 import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
 import { api, Order } from '../../lib/api'
 import { CryptoPaymentModal } from './CryptoPaymentModal'
 import { TelegramStartLogin } from './TelegramStartLogin'
 import { useSiteContent } from '../../hooks/useSiteContent'
+import { useCart } from '../../context/CartContext'
 
 type SidebarSection = 'profile' | 'circle' | 'orders' | 'settings' | 'admin'
 
@@ -262,7 +263,7 @@ function OrderCard({ order, onOpenPayment }: { order: Order; onOpenPayment: (ord
                 ))}
                 {order.delivery === 'meetup' && order.paymentDueEur != null && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 10, marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.5)' }}>Acconto Meetup 25%</span>
+                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.5)' }}>{order.paymentDescription || 'Acconto Meetup'}</span>
                     <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.82rem', color: '#D6B25E' }}>€{order.paymentDueEur}</span>
                   </div>
                 )}
@@ -333,7 +334,7 @@ function ProfileTelegramLogin({ onReady }: { onReady: () => Promise<void> }) {
 export function ProfilePage() {
   const [active, setActive] = useState<SidebarSection>('profile')
   const siteContent = useSiteContent()
-  const [user, setUser] = useState<null | { id: string; username?: string; firstName?: string; role?: string }>(null)
+  const [user, setUser] = useState<null | { id: string; username?: string; firstName?: string; role?: string; circleManualXp?: number; referralXp?: number }>(null)
   const [customerSignedIn, setCustomerSignedIn] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [orders, setOrders] = useState<Order[]>([])
@@ -341,15 +342,20 @@ export function ProfilePage() {
   const [confirmOrders, setConfirmOrders] = useState(true)
   const [newsletterEnabled, setNewsletterEnabled] = useState(false)
   const [newsletterMessage, setNewsletterMessage] = useState('')
+  const [referral, setReferral] = useState({ code: '', canCreate: false, referredBy: '', referralXp: 0, discountAvailable: false, discountUsedAt: '' })
+  const [friendCodeInput, setFriendCodeInput] = useState('')
+  const [referralMessage, setReferralMessage] = useState('')
   const [paymentOrder, setPaymentOrder] = useState<Order | null>(null)
+  const { addItem, clearCart } = useCart()
   const isAdmin = user?.role === 'admin'
 
   const loadDashboard = async () => {
-    const [customerResult, adminResult, ordersResult, newsletterResult] = await Promise.allSettled([
+    const [customerResult, adminResult, ordersResult, newsletterResult, referralResult] = await Promise.allSettled([
       api.customerMe(),
       api.me(),
       api.customerOrders(),
       api.newsletterPreference(),
+      api.customerReferral(),
     ])
     const customer = customerResult.status === 'fulfilled' ? customerResult.value.user : null
     const admin = adminResult.status === 'fulfilled' ? adminResult.value.user : null
@@ -357,6 +363,7 @@ export function ProfilePage() {
     setUser(customer ? { ...customer, role: admin?.role } : admin)
     setOrders(ordersResult.status === 'fulfilled' ? ordersResult.value : [])
     setNewsletterEnabled(newsletterResult.status === 'fulfilled' ? newsletterResult.value.enabled : false)
+    if (referralResult.status === 'fulfilled') setReferral(referralResult.value)
     setCheckingAuth(false)
   }
 
@@ -394,12 +401,59 @@ export function ProfilePage() {
       + (notificationsEnabled ? config.notificationsPoints : 0)
       + (totalOrders > 1 ? config.recurringCustomerPoints : 0)
       + productBoost
+      + Math.max(0, Number(user?.circleManualXp || 0))
+      + Math.max(0, Number(referral.referralXp || user?.referralXp || 0))
     const levels = [...config.levels].sort((a, b) => a.minScore - b.minScore)
     const current = [...levels].reverse().find(level => score >= level.minScore) || levels[0]
     const next = levels.find(level => level.minScore > score) || null
     const progress = next && current ? Math.min(100, Math.round(((score - current.minScore) / Math.max(1, next.minScore - current.minScore)) * 100)) : 100
     return { config, score, levels, current, next, progress }
-  }, [orders, notificationsEnabled, siteContent.circle])
+  }, [orders, notificationsEnabled, siteContent.circle, user?.circleManualXp, user?.referralXp, referral.referralXp])
+  const hasFastReorder = (circle.current?.perks || []).some(perk => /fast\s*reorder/i.test(perk))
+  const lastOrder = orders[0]
+
+  const repeatLastOrder = () => {
+    if (!lastOrder?.items?.length) return
+    clearCart()
+    lastOrder.items.forEach(item => {
+      addItem({
+        id: String(item.productId || item.id || ''),
+        name: item.name,
+        weight: item.weight,
+        strain: item.strain || undefined,
+        price: Number(item.price || 0),
+        quantity: Number(item.quantity || 1),
+      })
+    })
+  }
+
+  const createReferralCode = async () => {
+    setReferralMessage('')
+    try {
+      await api.createReferralCode()
+      await loadDashboard()
+      setReferralMessage('Codice amico creato.')
+    } catch (error) {
+      setReferralMessage(error instanceof Error ? error.message : 'Codice non disponibile.')
+    }
+  }
+
+  const applyReferralCode = async () => {
+    setReferralMessage('')
+    try {
+      await api.applyReferralCode(friendCodeInput)
+      setFriendCodeInput('')
+      await loadDashboard()
+      setReferralMessage('+60 XP e sconto 5% attivati.')
+    } catch (error) {
+      setReferralMessage(error instanceof Error ? error.message : 'Codice non valido.')
+    }
+  }
+
+  const copyReferralCode = () => {
+    if (!referral.code) return
+    navigator.clipboard?.writeText(referral.code).then(() => setReferralMessage('Codice copiato.')).catch(() => {})
+  }
 
   const toggleNewsletter = async () => {
     const next = !newsletterEnabled
@@ -423,6 +477,9 @@ export function ProfilePage() {
     setOrders([])
     setNewsletterEnabled(false)
     setNewsletterMessage('')
+    setReferral({ code: '', canCreate: false, referredBy: '', referralXp: 0, discountAvailable: false, discountUsedAt: '' })
+    setFriendCodeInput('')
+    setReferralMessage('')
     window.sessionStorage.removeItem('cc-telegram-login-customer')
     window.sessionStorage.removeItem('cc-telegram-login-admin')
   }
@@ -805,6 +862,71 @@ export function ProfilePage() {
                       ))}
                     </div>
                   </div>
+                  <div style={{ marginTop: 12, padding: 14, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+                      <div>
+                        <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 800, color: '#F5F5F5', marginBottom: 4 }}>
+                          Codice amico
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: 'rgba(245,245,245,0.42)', lineHeight: 1.45 }}>
+                          Il tuo amico riceve +60 XP e 5% sul primo ordine fino a 300g. Tu ricevi +80 XP.
+                        </div>
+                      </div>
+                      {referral.discountAvailable && (
+                        <span style={{ padding: '5px 8px', borderRadius: 999, background: 'rgba(214,178,94,0.08)', border: '1px solid rgba(214,178,94,0.14)', color: '#D6B25E', fontSize: '0.66rem', flexShrink: 0 }}>
+                          Sconto 5% attivo
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }} className="profile-account-grid">
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        {referral.code ? (
+                          <button
+                            type="button"
+                            onClick={copyReferralCode}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', borderRadius: 7, border: '1px solid rgba(214,178,94,0.18)', background: 'rgba(214,178,94,0.07)', color: '#D6B25E', cursor: 'pointer' }}
+                          >
+                            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800 }}>{referral.code}</span>
+                            <Copy size={14} />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={createReferralCode}
+                            disabled={!referral.canCreate}
+                            style={{ padding: '10px 12px', borderRadius: 7, border: referral.canCreate ? '1px solid rgba(214,178,94,0.22)' : '1px solid rgba(255,255,255,0.08)', background: referral.canCreate ? 'rgba(214,178,94,0.08)' : 'rgba(255,255,255,0.025)', color: referral.canCreate ? '#D6B25E' : 'rgba(245,245,245,0.34)', cursor: referral.canCreate ? 'pointer' : 'not-allowed', fontWeight: 800 }}
+                          >
+                            Crea codice
+                          </button>
+                        )}
+                        {!referral.canCreate && !referral.code && (
+                          <span style={{ fontSize: '0.68rem', color: 'rgba(245,245,245,0.34)' }}>Disponibile dal primo livello Circle.</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 7 }}>
+                        <input
+                          value={friendCodeInput}
+                          onChange={event => setFriendCodeInput(event.target.value.toUpperCase())}
+                          disabled={Boolean(referral.referredBy)}
+                          placeholder={referral.referredBy ? 'Codice gia usato' : 'Inserisci codice'}
+                          style={{ flex: 1, minWidth: 0, padding: '10px 11px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.09)', background: '#101011', color: '#F5F5F5', fontFamily: "'Inter', sans-serif", fontSize: '0.78rem' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={applyReferralCode}
+                          disabled={Boolean(referral.referredBy) || !friendCodeInput.trim()}
+                          style={{ padding: '0 12px', borderRadius: 7, border: '1px solid rgba(214,178,94,0.2)', background: 'rgba(214,178,94,0.08)', color: '#D6B25E', cursor: referral.referredBy || !friendCodeInput.trim() ? 'not-allowed' : 'pointer', fontWeight: 800, opacity: referral.referredBy || !friendCodeInput.trim() ? 0.5 : 1 }}
+                        >
+                          Usa
+                        </button>
+                      </div>
+                    </div>
+                    {referralMessage && (
+                      <div style={{ marginTop: 9, fontSize: '0.74rem', color: referralMessage.includes('non') || referralMessage.includes('gia') ? '#E57373' : '#D6B25E' }}>
+                        {referralMessage}
+                      </div>
+                    )}
+                  </div>
                   <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
                     {circle.levels.map(level => {
                       const unlocked = circle.score >= level.minScore
@@ -821,13 +943,18 @@ export function ProfilePage() {
                           <div style={{ fontSize: '0.74rem', color: 'rgba(245,245,245,0.42)', lineHeight: 1.45, marginBottom: 8 }}>
                             {level.description}
                           </div>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            {(level.perks || []).map(perk => (
-                              <span key={perk} style={{ padding: '4px 8px', borderRadius: 999, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.06)', color: unlocked ? '#D6B25E' : 'rgba(245,245,245,0.35)', fontSize: '0.66rem' }}>
-                                {perk}
-                              </span>
-                            ))}
-                          </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {(level.perks || []).map(perk => (
+                            <span key={perk} style={{ padding: '4px 8px', borderRadius: 999, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.06)', color: unlocked ? '#D6B25E' : 'rgba(245,245,245,0.35)', fontSize: '0.66rem' }}>
+                              {perk}
+                            </span>
+                          ))}
+                          {level.freeDeliveryAccess && !(level.perks || []).some(perk => /free\s*(delivery|shipping)|spedizione\s*gratis/i.test(perk)) && (
+                            <span style={{ padding: '4px 8px', borderRadius: 999, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.06)', color: unlocked ? '#D6B25E' : 'rgba(245,245,245,0.35)', fontSize: '0.66rem' }}>
+                              Free delivery
+                            </span>
+                          )}
+                        </div>
                         </div>
                       )
                     })}
@@ -848,6 +975,20 @@ export function ProfilePage() {
                   <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 12, flexShrink: 0 }}>
                     Storico Ordini
                   </div>
+                  {hasFastReorder && lastOrder && (
+                    <button
+                      type="button"
+                      onClick={repeatLastOrder}
+                      style={{ marginBottom: 12, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 12px', borderRadius: 8, border: '1px solid rgba(214,178,94,0.18)', background: 'rgba(214,178,94,0.07)', color: '#D6B25E', cursor: 'pointer' }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'Satoshi', sans-serif", fontWeight: 800, fontSize: '0.86rem' }}>
+                        <RotateCcw size={15} /> Ripeti ultimo ordine
+                      </span>
+                      <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', color: 'rgba(245,245,245,0.46)' }}>
+                        {lastOrder.items.length} prodotti
+                      </span>
+                    </button>
+                  )}
                   <div className="profile-orders-list">
                     {!customerSignedIn ? (
                       <div style={{ color: 'rgba(245,245,245,0.4)', fontSize: '0.84rem' }}>Accedi con Telegram per vedere gli ordini.</div>

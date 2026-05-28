@@ -20,6 +20,7 @@ const productsFile = path.join(dataDir, 'products.json')
 const ordersFile = path.join(dataDir, 'orders.json')
 const siteContentFile = path.join(dataDir, 'site-content.json')
 const newsletterSubscribersFile = path.join(dataDir, 'newsletter-subscribers.json')
+const customersFile = path.join(dataDir, 'customers.json')
 const mediaDir = path.join(dataDir, 'media')
 const maxImageUploadBytes = 15 * 1024 * 1024
 const maxVideoUploadBytes = 250 * 1024 * 1024
@@ -55,11 +56,11 @@ const defaultSiteContent = {
     notificationsPoints: 40,
     recurringCustomerPoints: 80,
     levels: [
-      { id: 'guest', label: 'Guest', minScore: 0, description: 'Accesso base al club.', perks: ['Accesso catalogo', 'Area privata'] },
-      { id: 'member', label: 'Member', minScore: 180, description: 'Cliente verificato con primi vantaggi.', perks: ['Passport storico', 'Notifiche prioritarie'] },
-      { id: 'insider', label: 'Insider', minScore: 420, description: 'Profilo ricorrente con accesso migliorato.', perks: ['Priority processing', 'Private preview'] },
-      { id: 'priority', label: 'Priority', minScore: 760, description: 'Corsia preferenziale sui drop selezionati.', perks: ['Reserved access', 'Fast reorder'] },
-      { id: 'vault', label: 'Vault', minScore: 1200, description: 'Massimo livello CAMPO Circle.', perks: ['Vault drops', 'Accesso riservato'] },
+      { id: 'guest', label: 'Explorer', minScore: 0, description: 'Ingresso nel club con accesso completo al catalogo privato.', perks: ['Accesso al catalogo privato', 'Area personale con storico ordini'], earlyDropAccess: false, freeDeliveryAccess: false, meetupDepositDiscountPct: 0 },
+      { id: 'member', label: 'Resident', minScore: 180, description: 'Profilo verificato con gestione ordini piu fluida.', perks: ['Passaporto ordini aggiornato', 'Notifiche prioritarie su ordini e novita'], earlyDropAccess: false, freeDeliveryAccess: false, meetupDepositDiscountPct: 0 },
+      { id: 'insider', label: 'Insider', minScore: 420, description: 'Cliente ricorrente con vantaggi di velocita sui drop.', perks: ['Accesso anticipato ai nuovi drop', 'Riordino veloce dai tuoi ordini'], earlyDropAccess: true, freeDeliveryAccess: false, meetupDepositDiscountPct: 0 },
+      { id: 'priority', label: 'Priority', minScore: 760, description: 'Corsia preferenziale con priorita alta e delivery inclusa.', perks: ['Accesso anticipato premium', 'Riordino ultra rapido', 'Delivery gratuita'], earlyDropAccess: true, freeDeliveryAccess: true, meetupDepositDiscountPct: 20 },
+      { id: 'vault', label: 'Vault Elite', minScore: 1200, description: 'Livello massimo CAMPO Circle con accesso riservato.', perks: ['Selezioni riservate Vault', 'Accesso anticipato totale', 'Riordino immediato', 'Delivery gratuita prioritaria'], earlyDropAccess: true, freeDeliveryAccess: true, meetupDepositDiscountPct: 20 },
     ],
   },
 }
@@ -69,6 +70,7 @@ const port = Number(process.env.API_PORT || 3001)
 const sessionSecret = process.env.SESSION_SECRET || 'campoclaro-dev-secret'
 const adminIds = new Set((process.env.ADMIN_TELEGRAM_IDS || '').split(',').map(v => v.trim()).filter(Boolean))
 const ccppFee = 50
+const courierDeliveryFee = 20
 const meetupDepositRate = 0.25
 const autoDeliverCheckMs = 60 * 60 * 1000
 const cryptoPaymentCheckMs = Number(process.env.CRYPTO_PAYMENT_CHECK_MS || 120000)
@@ -174,8 +176,41 @@ function cryptoAmountForEur(totalEur, currency, rate) {
   return (Math.ceil(raw * factor) / factor).toFixed(meta.displayDecimals)
 }
 
-function meetupDepositForTotal(totalEur) {
-  return Math.max(0, Math.floor(Number(totalEur || 0) * meetupDepositRate))
+function safePercent(value) {
+  return Math.min(100, Math.max(0, Number(value || 0)))
+}
+
+function roundEur(value) {
+  return Math.max(0, Math.round(Number(value || 0)))
+}
+
+function formatPercent(value) {
+  const rounded = Number(Number(value || 0).toFixed(2))
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace(/(\.\d*?[1-9])0+$/, '$1')
+}
+
+function meetupDepositRateForDiscount(discountPct = 0) {
+  return meetupDepositRate * (1 - safePercent(discountPct) / 100)
+}
+
+function meetupDepositLabel(discountPct = 0) {
+  const discount = safePercent(discountPct)
+  const effectiveRatePct = meetupDepositRateForDiscount(discount) * 100
+  return discount > 0
+    ? `Acconto Meetup ${formatPercent(effectiveRatePct)}% (Circle -${formatPercent(discount)}%)`
+    : `Acconto Meetup ${formatPercent(effectiveRatePct)}%`
+}
+
+function meetupDepositForTotal(totalEur, discountPct = 0) {
+  return roundEur(Math.max(0, Number(totalEur || 0)) * meetupDepositRateForDiscount(discountPct))
+}
+
+function itemWeightGrams(item = {}) {
+  const weight = String(item.weight || '').toLowerCase().replace(',', '.')
+  const match = weight.match(/(\d+(?:\.\d+)?)\s*(kg|g)?/)
+  if (!match) return 0
+  const value = Number(match[1] || 0)
+  return (match[2] || 'g') === 'kg' ? value * 1000 : value
 }
 
 function cryptoPaymentUri(currency, address, amount) {
@@ -269,11 +304,11 @@ async function notifyCustomerOrderUpdate(order, event, { needsSupport = false } 
   ]
 
   if (event === 'created' && isMeetup && order.paymentDueEur) {
-    lines.push(`<b>Acconto Meetup 25% da pagare:</b> €${escapeHtml(order.paymentDueEur)}`)
+    lines.push(`<b>${escapeHtml(order.paymentDescription || 'Acconto Meetup')} da pagare:</b> €${escapeHtml(order.paymentDueEur)}`)
   }
 
   if (event === 'payment_confirmed') {
-    lines.push(`<b>${isMeetup ? 'Acconto Meetup 25%' : 'Pagamento'}:</b> ${order.payment === 'crypto'
+    lines.push(`<b>${isMeetup ? escapeHtml(order.paymentDescription || 'Acconto Meetup') : 'Pagamento'}:</b> ${order.payment === 'crypto'
       ? `${escapeHtml(order.cryptoCurrency)} ${escapeHtml(order.cryptoPaidAmount || '')}`.trim()
       : 'CCPP confermato'}`)
     if (order.cryptoTxHash) lines.push(`TX: <code>${escapeHtml(order.cryptoTxHash)}</code>`)
@@ -320,6 +355,144 @@ function normalizeSubscriber(user, enabled) {
   }
 }
 
+function normalizeCustomerRecord(user, existing = {}) {
+  const now = new Date().toISOString()
+  return {
+    ...existing,
+    id: String(user.id || existing.id || '').trim(),
+    firstName: String(user.firstName ?? existing.firstName ?? ''),
+    lastName: String(user.lastName ?? existing.lastName ?? ''),
+    username: String(user.username ?? existing.username ?? ''),
+    photoUrl: String(user.photoUrl ?? existing.photoUrl ?? ''),
+    role: String(user.role || existing.role || 'customer'),
+    manualXp: Math.max(0, Number(existing.manualXp || 0)),
+    referralCode: String(existing.referralCode || user.referralCode || ''),
+    referralXp: Math.max(0, Number(existing.referralXp || user.referralXp || 0)),
+    referredBy: String(existing.referredBy || user.referredBy || ''),
+    referralDiscountAvailable: existing.referralDiscountAvailable === true || user.referralDiscountAvailable === true,
+    referralDiscountUsedAt: String(existing.referralDiscountUsedAt || user.referralDiscountUsedAt || ''),
+    firstSeenAt: existing.firstSeenAt || now,
+    lastSeenAt: now,
+  }
+}
+
+async function upsertCustomer(user) {
+  const id = String(user?.id || '').trim()
+  if (!id) return null
+  const customers = await readJson(customersFile, [])
+  const index = customers.findIndex(item => String(item.id) === id)
+  const record = normalizeCustomerRecord(user, index === -1 ? {} : customers[index])
+  if (index === -1) customers.push(record)
+  else customers[index] = record
+  await writeJson(customersFile, customers)
+  return record
+}
+
+async function customerWithStoredData(user) {
+  if (!user?.id) return null
+  const customers = await readJson(customersFile, [])
+  const stored = customers.find(item => String(item.id) === String(user.id))
+  if (!stored) return user
+  return {
+    ...user,
+    firstName: user.firstName || stored.firstName || '',
+    lastName: user.lastName || stored.lastName || '',
+    username: user.username || stored.username || '',
+    photoUrl: user.photoUrl || stored.photoUrl || '',
+    role: user.role || stored.role || 'customer',
+    circleManualXp: Math.max(0, Number(stored.manualXp || 0)),
+    referralCode: stored.referralCode || '',
+    referralXp: Math.max(0, Number(stored.referralXp || 0)),
+    referredBy: stored.referredBy || '',
+    referralDiscountAvailable: stored.referralDiscountAvailable === true,
+    referralDiscountUsedAt: stored.referralDiscountUsedAt || '',
+  }
+}
+
+function calculateCustomerCircle(customer, orders = [], content = defaultSiteContent) {
+  const id = String(customer?.id || '')
+  const config = normalizeSiteContent(content).circle
+  const customerOrders = orders.filter(order => String(order.customer?.id || '') === id)
+  const completed = customerOrders.filter(order => order.status === 'completed').length
+  const paid = customerOrders.filter(order => order.paymentStatus === 'paid_confirmed').length
+  const productBoost = customerOrders
+    .filter(order => order.status === 'completed')
+    .reduce((sum, order) => sum + Number(order.circleScoreAward || 0), 0)
+  const notificationsBonus = customerOrders.some(order => order.notificationsEnabled !== false) ? config.notificationsPoints : 0
+  const score = completed * config.orderCompletedPoints
+    + paid * config.paymentVerifiedPoints
+    + notificationsBonus
+    + (customerOrders.length > 1 ? config.recurringCustomerPoints : 0)
+    + productBoost
+    + Math.max(0, Number(customer?.manualXp || customer?.circleManualXp || 0))
+    + Math.max(0, Number(customer?.referralXp || 0))
+  const levels = [...config.levels].sort((a, b) => a.minScore - b.minScore)
+  const current = [...levels].reverse().find(level => score >= level.minScore) || levels[0]
+  return { score, current, earlyDropAccess: current?.earlyDropAccess === true, freeDeliveryAccess: current?.freeDeliveryAccess === true }
+}
+
+async function canAccessEarlyDrop(req) {
+  const session = readCustomerSession(req) || readSession(req)
+  if (!session?.id) return false
+  const [storedCustomers, orders, content] = await Promise.all([
+    readJson(customersFile, []),
+    readJson(ordersFile, []),
+    readJson(siteContentFile, defaultSiteContent),
+  ])
+  const stored = storedCustomers.find(item => String(item.id) === String(session.id))
+  return calculateCustomerCircle({ ...session, ...stored }, orders, content).earlyDropAccess
+}
+
+function productVisibleForCustomer(product, earlyDropAccess) {
+  if (product.active === false) return false
+  if (product.earlyDropEnabled !== true) return true
+  const until = Date.parse(product.earlyDropUntil || '')
+  if (!Number.isFinite(until) || until <= Date.now()) return true
+  return earlyDropAccess
+}
+
+async function notifyEarlyDropCustomers(product) {
+  if (product.earlyDropEnabled !== true || product.earlyDropNotifiedAt) return 0
+  const until = Date.parse(product.earlyDropUntil || '')
+  if (!Number.isFinite(until) || until <= Date.now()) return 0
+  const [storedCustomers, orders, content] = await Promise.all([
+    readJson(customersFile, []),
+    readJson(ordersFile, []),
+    readJson(siteContentFile, defaultSiteContent),
+  ])
+  let sent = 0
+  for (const customer of storedCustomers) {
+    if (!calculateCustomerCircle(customer, orders, content).earlyDropAccess) continue
+    const message = await sendTelegramMessage(customer.id, [
+      '<b>Early Drop CAMPO Circle</b>',
+      `${escapeHtml(product.name)} e disponibile in anteprima.`,
+      `Accesso anticipato: ${Math.max(1, Number(product.earlyDropDays || 1))} giorni.`,
+      '',
+      'Apri il catalogo dal sito per vederlo prima degli altri.',
+    ].join('\n'))
+    if (message) sent += 1
+  }
+  return sent
+}
+
+function generateReferralCode(user, existingCodes) {
+  const base = String(user.username || user.firstName || 'CAMPO')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '')
+    .slice(0, 6) || 'CAMPO'
+  for (let i = 0; i < 8; i += 1) {
+    const code = `${base}${nanoid(4).toUpperCase()}`
+    if (!existingCodes.has(code)) return code
+  }
+  return `CC${nanoid(8).toUpperCase()}`
+}
+
+function canCreateReferralCode(circleState, content = defaultSiteContent) {
+  const levels = normalizeSiteContent(content).circle.levels
+  const firstUnlock = levels.find(level => Number(level.minScore || 0) > 0)
+  return firstUnlock ? Number(circleState.score || 0) >= Number(firstUnlock.minScore || 0) : Number(circleState.score || 0) > 0
+}
+
 function formatNewsletterMessage(title, body) {
   return [
     `<b>${escapeHtml(title)}</b>`,
@@ -341,12 +514,17 @@ async function notifyAdmins(order, reason = 'Nuovo ordine') {
   const lines = [
     `<b>${escapeHtml(reason)}</b>`,
     `<b>Ordine:</b> ${escapeHtml(order.id)}`,
+    order.priorityCheckout ? `<b>Priority Checkout:</b> ${escapeHtml(order.priorityLevel || 'Circle')}` : '',
+    order.freeDelivery ? `<b>Free delivery:</b> ${escapeHtml(order.freeDeliveryLevel || 'Circle')}` : '',
     `<b>Cliente:</b> ${escapeHtml(formatCustomer(order.customer))}`,
     `<b>Consegna:</b> ${isMeetup ? 'Meetup Barcellona' : 'Spedizione'}`,
     order.courier ? `<b>Corriere scelto:</b> ${escapeHtml(order.courier)}` : '',
     `<b>Pagamento:</b> ${paymentLabel}`,
+    order.referralDiscount ? `<b>Sconto codice amico:</b> -€${order.referralDiscount}` : '',
     `<b>Totale:</b> €${order.total}`,
-    isMeetup && order.paymentDueEur ? `<b>Acconto Meetup 25%:</b> €${order.paymentDueEur}` : '',
+    isMeetup && order.paymentDueEur ? `<b>${escapeHtml(order.paymentDescription || 'Acconto Meetup')}:</b> €${order.paymentDueEur}` : '',
+    Number(order.deliveryFee || 0) > 0 ? `<b>Delivery:</b> €${Number(order.deliveryFee).toFixed(2)}` : '',
+    Number(order.ccppFee || order.fees || 0) > 0 ? `<b>Supplemento CCPP:</b> €${Number(order.ccppFee || order.fees).toFixed(2)}` : '',
     cryptoAmounts ? `<b>Gia pagato:</b> €${cryptoAmounts.paid}` : '',
     cryptoAmounts && isMeetup ? `<b>Manca per acconto:</b> €${cryptoAmounts.paymentRemaining}` : '',
     cryptoAmounts ? `<b>Saldo ordine restante:</b> €${cryptoAmounts.orderRemaining}` : '',
@@ -576,6 +754,7 @@ function completeTelegramLogin(scope, req, res) {
       res.cookie('cc_session', signSession(login.user), { httpOnly: true, sameSite: 'lax', maxAge: 7 * 86400 * 1000 })
     }
   }
+  upsertCustomer(login.user).catch(error => console.error('Customer save failed:', error.message))
   return res.json({ status: 'complete', user: login.user })
 }
 
@@ -596,6 +775,15 @@ function normalizeProduct(input, existing = {}) {
     ? [...new Set(value.map(String).map(v => v.trim()).filter(Boolean))].slice(0, max)
     : []
   const fallbackId = String(input.name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || nanoid(10)
+  const earlyDropEnabled = input.earlyDropEnabled === true
+  const earlyDropDays = earlyDropEnabled ? Math.min(30, Math.max(1, Math.trunc(Number(input.earlyDropDays || existing.earlyDropDays || 1)))) : 0
+  const earlyDropChanged = earlyDropEnabled !== (existing.earlyDropEnabled === true)
+    || earlyDropDays !== Math.trunc(Number(existing.earlyDropDays || 0))
+  const earlyDropUntil = earlyDropEnabled
+    ? earlyDropChanged || !existing.earlyDropUntil
+      ? new Date(Date.now() + earlyDropDays * 86400 * 1000).toISOString()
+      : String(existing.earlyDropUntil)
+    : ''
   return {
     ...existing,
     id: String(input.id || existing.id || fallbackId).trim(),
@@ -611,11 +799,12 @@ function normalizeProduct(input, existing = {}) {
     thc: String(input.thc || '').trim(),
     cbd: String(input.cbd || '').trim(),
     tags: Array.isArray(input.tags) ? input.tags.map(String).map(v => v.trim()).filter(Boolean).slice(0, 2) : [],
-    gradient: String(input.gradient || existing.gradient || 'linear-gradient(135deg, #111 0%, #222 60%, #050505 100%)'),
+    gradient: String(input.gradient || existing.gradient || '#0d0d0e'),
     glowColor: String(input.glowColor || existing.glowColor || 'rgba(214,178,94,0.12)'),
-    circleMinLevel: String(input.circleMinLevel || existing.circleMinLevel || '').trim(),
-    circleScoreBoost: Number.isFinite(Number(input.circleScoreBoost)) ? Math.max(0, Number(input.circleScoreBoost)) : Number(existing.circleScoreBoost || 0),
-    circlePrivateDrop: input.circlePrivateDrop === true,
+    earlyDropEnabled,
+    earlyDropDays,
+    earlyDropUntil,
+    earlyDropNotifiedAt: earlyDropEnabled && !earlyDropChanged ? String(existing.earlyDropNotifiedAt || '') : '',
     active: input.active !== false,
   }
 }
@@ -629,16 +818,93 @@ function createProductId(name, products) {
   return `${base}-${suffix}`
 }
 
+const circleLevelCopyById = {
+  guest: {
+    label: 'Explorer',
+    description: 'Ingresso nel club con accesso completo al catalogo privato.',
+  },
+  member: {
+    label: 'Resident',
+    description: 'Profilo verificato con gestione ordini piu fluida.',
+  },
+  insider: {
+    label: 'Insider',
+    description: 'Cliente ricorrente con vantaggi di velocita sui drop.',
+  },
+  priority: {
+    label: 'Priority',
+    description: 'Corsia preferenziale con priorita alta e delivery inclusa.',
+  },
+  vault: {
+    label: 'Vault Elite',
+    description: 'Livello massimo CAMPO Circle con accesso riservato.',
+  },
+}
+
+const circleLegacyPerkCopy = new Map([
+  ['accesso catalogo', 'Accesso al catalogo privato'],
+  ['area privata', 'Area personale con storico ordini'],
+  ['passport storico', 'Passaporto ordini aggiornato'],
+  ['notifiche prioritarie', 'Notifiche prioritarie su ordini e novita'],
+  ['priority processing', 'Gestione ordine in corsia veloce'],
+  ['early drop', 'Accesso anticipato ai nuovi drop'],
+  ['fast reorder', 'Riordino veloce dai tuoi ordini'],
+  ['free delivery', 'Delivery gratuita'],
+  ['private preview', 'Accesso anticipato ai nuovi drop'],
+  ['reserved access', 'Accesso riservato ai drop selezionati'],
+  ['accesso riservato', 'Accesso riservato ai drop selezionati'],
+  ['vault drops', 'Selezioni riservate Vault'],
+])
+
+function normalizeCirclePerkCopy(value) {
+  const clean = String(value || '').trim()
+  if (!clean) return ''
+  const mapped = circleLegacyPerkCopy.get(clean.toLowerCase())
+  return mapped || clean
+}
+
+function normalizeCircleLevelLabel(id, value) {
+  const clean = String(value || '').trim()
+  const fallback = circleLevelCopyById[id]?.label || clean
+  if (!clean) return fallback
+  if (['guest', 'member', 'insider', 'priority', 'vault', 'vault elite'].includes(clean.toLowerCase())) return fallback
+  return clean
+}
+
+function normalizeCircleLevelDescription(id, value) {
+  const clean = String(value || '').trim()
+  const fallback = circleLevelCopyById[id]?.description || clean
+  if (!clean) return fallback
+  const legacyDescriptions = new Set([
+    'accesso base al club.',
+    'cliente verificato con primi vantaggi.',
+    'profilo ricorrente con accesso migliorato.',
+    'corsia preferenziale sui drop selezionati.',
+    'massimo livello CAMPO circle.'.toLowerCase(),
+  ])
+  return legacyDescriptions.has(clean.toLowerCase()) ? fallback : clean
+}
+
 function normalizeSiteContent(input = {}) {
   const circleInput = input.circle && typeof input.circle === 'object' ? input.circle : defaultSiteContent.circle
+  const defaultEarlyDropLevels = new Set(defaultSiteContent.circle.levels.filter(level => level.earlyDropAccess).map(level => level.id))
+  const defaultFreeDeliveryLevels = new Set(defaultSiteContent.circle.levels.filter(level => level.freeDeliveryAccess).map(level => level.id))
   const circleLevels = Array.isArray(circleInput.levels)
-    ? circleInput.levels.map((level, index) => ({
-      id: String(level.id || level.label || `level-${index + 1}`).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `level-${index + 1}`,
-      label: String(level.label || '').trim(),
-      minScore: Math.max(0, Number(level.minScore || 0)),
-      description: String(level.description || '').trim(),
-      perks: Array.isArray(level.perks) ? level.perks.map(String).map(v => v.trim()).filter(Boolean).slice(0, 6) : [],
-    })).filter(level => level.label)
+    ? circleInput.levels.map((level, index) => {
+      const id = String(level.id || level.label || `level-${index + 1}`).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `level-${index + 1}`
+      const rawPerks = Array.isArray(level.perks) ? level.perks.map(String).map(v => v.trim()).filter(Boolean).slice(0, 6) : []
+      const perks = [...new Set(rawPerks.map(normalizeCirclePerkCopy).filter(Boolean))].slice(0, 6)
+      return {
+        id,
+        label: normalizeCircleLevelLabel(id, level.label),
+        minScore: Math.max(0, Number(level.minScore || 0)),
+        description: normalizeCircleLevelDescription(id, level.description),
+        perks,
+        earlyDropAccess: level.earlyDropAccess === true || (level.earlyDropAccess === undefined && (defaultEarlyDropLevels.has(id) || perks.some(perk => /early\s*drop|accesso\s*anticipato/i.test(perk)))),
+        freeDeliveryAccess: level.freeDeliveryAccess === true || (level.freeDeliveryAccess === undefined && (defaultFreeDeliveryLevels.has(id) || perks.some(perk => /free\s*(delivery|shipping)|spedizione\s*gratis|delivery\s*gratuita/i.test(perk)))),
+        meetupDepositDiscountPct: safePercent(level.meetupDepositDiscountPct),
+      }
+    }).filter(level => level.label)
     : defaultSiteContent.circle.levels
   return {
     welcomeTitle: String(input.welcomeTitle || defaultSiteContent.welcomeTitle).trim(),
@@ -890,7 +1156,7 @@ async function updateCryptoPayment(order, payment) {
   await notifyCustomerOrderUpdate(order, 'payment_confirmed')
 
   if (order.delivery === 'meetup') {
-    await notifyAdmins(order, 'Meetup: acconto 25% pagato')
+    await notifyAdmins(order, 'Meetup: acconto pagato')
     return true
   }
 
@@ -997,8 +1263,9 @@ async function applyAdminOrderAction(orderId, action) {
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
 
 app.get('/api/products', async (_req, res) => {
+  const earlyDropAccess = await canAccessEarlyDrop(_req)
   const products = await readJson(productsFile, [])
-  res.json(products.filter(product => product.active !== false))
+  res.json(products.filter(product => productVisibleForCustomer(product, earlyDropAccess)))
 })
 
 app.get('/api/site-content', async (_req, res) => {
@@ -1026,11 +1293,20 @@ app.post('/api/orders', async (req, res) => {
   }
 
   const subtotal = items.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0)
-  const productsForCircle = await readJson(productsFile, [])
+  const [productsForCircle, existingOrders, storedCustomers, siteContent] = await Promise.all([
+    readJson(productsFile, []),
+    readJson(ordersFile, []),
+    readJson(customersFile, []),
+    readJson(siteContentFile, defaultSiteContent),
+  ])
+  const storedCustomer = storedCustomers.find(item => String(item.id) === String(customer.id))
+  const circleState = calculateCustomerCircle({ ...customer, ...storedCustomer }, existingOrders, siteContent)
+  const currentPerks = circleState.current?.perks || []
+  const priorityCheckout = currentPerks.some(perk => /priority|fast\s*reorder/i.test(perk)) || ['insider', 'priority', 'vault'].includes(String(circleState.current?.id || ''))
+  const freeDelivery = delivery === 'ship' && circleState.freeDeliveryAccess === true
   const productById = new Map(productsForCircle.map(product => [String(product.id), product]))
   const orderItems = items.map(item => {
     const product = productById.get(String(item.id))
-    const circleScoreBoost = Math.max(0, Number(product?.circleScoreBoost || 0))
     return {
       productId: String(item.id),
       name: String(item.name),
@@ -1038,23 +1314,30 @@ app.post('/api/orders', async (req, res) => {
       strain: String(item.strain || ''),
       price: Number(item.price),
       quantity: Number(item.quantity),
-      circleScoreBoost,
-      circlePrivateDrop: product?.circlePrivateDrop === true,
-      circleMinLevel: String(product?.circleMinLevel || ''),
     }
   })
-  const circleScoreAward = orderItems.reduce((sum, item) => sum + Number(item.circleScoreBoost || 0) * Number(item.quantity || 1), 0)
-  const fees = payment === 'ccpp' ? ccppFee : 0
-  const total = subtotal + fees
-  const paymentDueEur = delivery === 'meetup' ? meetupDepositForTotal(total) : total
-  const paymentDescription = delivery === 'meetup' ? 'Acconto Meetup 25%' : 'Pagamento ordine'
+  const circleScoreAward = 0
+  const orderWeightGrams = orderItems.reduce((sum, item) => sum + itemWeightGrams(item) * Number(item.quantity || 1), 0)
+  const firstCustomerOrder = !existingOrders.some(order => String(order.customer?.id || '') === String(customer.id))
+  const referralDiscountEligible = storedCustomer?.referralDiscountAvailable === true
+    && !storedCustomer.referralDiscountUsedAt
+    && firstCustomerOrder
+    && orderWeightGrams > 0
+    && orderWeightGrams <= 300
+  const referralDiscount = referralDiscountEligible ? Math.round(subtotal * 0.05) : 0
+  const deliveryFee = delivery === 'ship' && !freeDelivery ? courierDeliveryFee : 0
+  const ccppCharge = payment === 'ccpp' ? ccppFee : 0
+  const fees = ccppCharge
+  const total = Math.max(0, subtotal - referralDiscount) + deliveryFee + ccppCharge
+  const meetupDepositDiscountPct = delivery === 'meetup' ? safePercent(circleState.current?.meetupDepositDiscountPct) : 0
+  const paymentDueEur = delivery === 'meetup' ? meetupDepositForTotal(total, meetupDepositDiscountPct) : total
+  const paymentDescription = delivery === 'meetup' ? meetupDepositLabel(meetupDepositDiscountPct) : 'Pagamento ordine'
   const cryptoCurrency = String(req.body.cryptoCurrency || 'BTC')
   const cryptoPayment = payment === 'crypto' ? cryptoWallets[cryptoCurrency] || cryptoWallets.BTC : null
   const rates = cryptoPayment ? await getCryptoRatesEur() : null
   const cryptoExpectedAmount = cryptoPayment ? cryptoAmountForEur(paymentDueEur, cryptoCurrency, rates[cryptoCurrency]) : ''
   if (cryptoPayment) {
-    const orders = await readJson(ordersFile, [])
-    if (publicCryptoWallets(orders).find(wallet => wallet.id === cryptoCurrency)?.busy) {
+    if (publicCryptoWallets(existingOrders).find(wallet => wallet.id === cryptoCurrency)?.busy) {
       return res.status(409).json({ error: delivery === 'meetup' ? 'Wallet temporaneamente occupato. Scegli un altra valuta.' : 'Wallet temporaneamente occupato. Scegli un altra valuta o CCPP.' })
     }
   }
@@ -1097,20 +1380,39 @@ app.post('/api/orders', async (req, res) => {
     cryptoRemainingEur: cryptoPayment ? paymentDueEur : 0,
     customer,
     notificationsEnabled: req.body.notificationsEnabled !== false,
+    priorityCheckout,
+    priorityLevel: priorityCheckout ? String(circleState.current?.label || '') : '',
+    freeDelivery,
+    freeDeliveryLevel: freeDelivery ? String(circleState.current?.label || '') : '',
     trackingNumber: '',
     trackingProvider: 'Auto Free',
     trackingUrl: '',
     address: cleanAddress,
     items: orderItems,
     subtotal,
+    referralDiscount,
+    referralDiscountCode: referralDiscountEligible ? String(storedCustomer.referredBy || '') : '',
+    referralDiscountWeightGrams: orderWeightGrams,
+    deliveryFee,
+    ccppFee: ccppCharge,
+    meetupDepositDiscountPct,
     fees,
     total,
     circleScoreAward,
   }
 
-  const orders = await readJson(ordersFile, [])
-  orders.unshift(order)
-  await writeJson(ordersFile, orders)
+  existingOrders.unshift(order)
+  await writeJson(ordersFile, existingOrders)
+  if (referralDiscountEligible && storedCustomer) {
+    storedCustomer.referralDiscountAvailable = false
+    storedCustomer.referralDiscountUsedAt = order.createdAt
+    const storedIndex = storedCustomers.findIndex(item => String(item.id) === String(customer.id))
+    if (storedIndex === -1) storedCustomers.push(storedCustomer)
+    else storedCustomers[storedIndex] = storedCustomer
+    await writeJson(customersFile, storedCustomers)
+  } else {
+    await upsertCustomer(customer).catch(error => console.error('Customer save failed:', error.message))
+  }
   await notifyCustomerOrderUpdate(order, 'created')
   if (payment === 'ccpp') {
     await notifyAdmins(order, 'Nuovo ordine CCPP')
@@ -1131,6 +1433,13 @@ app.get('/api/orders/:id/public', async (req, res) => {
     status: order.status,
     payment: order.payment,
     total: order.total,
+    referralDiscount: order.referralDiscount || 0,
+    referralDiscountWeightGrams: order.referralDiscountWeightGrams || 0,
+    freeDelivery: order.freeDelivery === true,
+    freeDeliveryLevel: order.freeDeliveryLevel || '',
+    deliveryFee: Number(order.deliveryFee || 0),
+    ccppFee: Number(order.ccppFee || order.fees || 0),
+    meetupDepositDiscountPct: safePercent(order.meetupDepositDiscountPct || 0),
     paymentDueEur: order.paymentDueEur ?? order.total,
     paymentDescription: order.paymentDescription || 'Pagamento ordine',
     paymentStatus: order.paymentStatus,
@@ -1183,8 +1492,25 @@ app.get('/api/customer/telegram/status/:requestId', (req, res) => {
   completeTelegramLogin('customer', req, res)
 })
 
-app.get('/api/customer/me', (req, res) => {
-  res.json({ user: readCustomerSession(req) })
+app.get('/api/customer/me', async (req, res) => {
+  const customer = readCustomerSession(req)
+  if (customer?.id) await upsertCustomer(customer).catch(error => console.error('Customer save failed:', error.message))
+  const user = await customerWithStoredData(customer)
+  if (!user?.id) return res.json({ user })
+  const [orders, content] = await Promise.all([
+    readJson(ordersFile, []),
+    readJson(siteContentFile, defaultSiteContent),
+  ])
+  const circleState = calculateCustomerCircle(user, orders, content)
+  res.json({
+    user: {
+      ...user,
+      circleLevelId: String(circleState.current?.id || ''),
+      circleLevelLabel: String(circleState.current?.label || ''),
+      freeDeliveryAccess: circleState.freeDeliveryAccess === true,
+      meetupDepositDiscountPct: safePercent(circleState.current?.meetupDepositDiscountPct || 0),
+    },
+  })
 })
 
 app.get('/api/customer/orders', async (req, res) => {
@@ -1216,12 +1542,89 @@ app.put('/api/customer/newsletter', async (req, res) => {
   res.json({ enabled })
 })
 
+app.get('/api/customer/referral', async (req, res) => {
+  const customer = readCustomerSession(req)
+  if (!customer?.id) return res.status(401).json({ error: 'Accesso Telegram richiesto' })
+  await upsertCustomer(customer).catch(error => console.error('Customer save failed:', error.message))
+  const [customers, orders, content] = await Promise.all([
+    readJson(customersFile, []),
+    readJson(ordersFile, []),
+    readJson(siteContentFile, defaultSiteContent),
+  ])
+  const stored = customers.find(item => String(item.id) === String(customer.id)) || {}
+  const circleState = calculateCustomerCircle({ ...customer, ...stored }, orders, content)
+  res.json({
+    code: stored.referralCode || '',
+    canCreate: canCreateReferralCode(circleState, content),
+    referredBy: stored.referredBy || '',
+    referralXp: Math.max(0, Number(stored.referralXp || 0)),
+    discountAvailable: stored.referralDiscountAvailable === true && !stored.referralDiscountUsedAt,
+    discountUsedAt: stored.referralDiscountUsedAt || '',
+  })
+})
+
+app.post('/api/customer/referral/code', async (req, res) => {
+  const customer = readCustomerSession(req)
+  if (!customer?.id) return res.status(401).json({ error: 'Accesso Telegram richiesto' })
+  const [customers, orders, content] = await Promise.all([
+    readJson(customersFile, []),
+    readJson(ordersFile, []),
+    readJson(siteContentFile, defaultSiteContent),
+  ])
+  const index = customers.findIndex(item => String(item.id) === String(customer.id))
+  const stored = index === -1 ? normalizeCustomerRecord(customer) : normalizeCustomerRecord(customer, customers[index])
+  const circleState = calculateCustomerCircle(stored, orders, content)
+  if (!canCreateReferralCode(circleState, content)) {
+    return res.status(403).json({ error: 'Codice amico disponibile dal primo livello Circle.' })
+  }
+  if (!stored.referralCode) {
+    stored.referralCode = generateReferralCode(stored, new Set(customers.map(item => String(item.referralCode || '').toUpperCase()).filter(Boolean)))
+  }
+  if (index === -1) customers.push(stored)
+  else customers[index] = stored
+  await writeJson(customersFile, customers)
+  res.json({ code: stored.referralCode })
+})
+
+app.post('/api/customer/referral/apply', async (req, res) => {
+  const customer = readCustomerSession(req)
+  if (!customer?.id) return res.status(401).json({ error: 'Accesso Telegram richiesto' })
+  const code = String(req.body.code || '').trim().toUpperCase()
+  if (!code) return res.status(400).json({ error: 'Inserisci un codice valido.' })
+
+  const [customers, orders] = await Promise.all([readJson(customersFile, []), readJson(ordersFile, [])])
+  const ownerIndex = customers.findIndex(item => String(item.referralCode || '').toUpperCase() === code)
+  if (ownerIndex === -1) return res.status(404).json({ error: 'Codice amico non trovato.' })
+  const friendOrderExists = orders.some(order => String(order.customer?.id || '') === String(customer.id))
+  if (friendOrderExists) return res.status(409).json({ error: 'Codice valido solo prima del primo ordine.' })
+
+  const friendIndex = customers.findIndex(item => String(item.id) === String(customer.id))
+  const friend = friendIndex === -1 ? normalizeCustomerRecord(customer) : normalizeCustomerRecord(customer, customers[friendIndex])
+  const owner = normalizeCustomerRecord(customers[ownerIndex], customers[ownerIndex])
+  if (String(owner.id) === String(friend.id)) return res.status(409).json({ error: 'Non puoi usare il tuo codice.' })
+  if (friend.referredBy) return res.status(409).json({ error: 'Hai gia usato un codice amico.' })
+
+  friend.referredBy = owner.id
+  friend.referralXp = Math.max(0, Number(friend.referralXp || 0)) + 60
+  friend.referralDiscountAvailable = true
+  owner.referralXp = Math.max(0, Number(owner.referralXp || 0)) + 80
+  customers[ownerIndex] = owner
+  if (friendIndex === -1) customers.push(friend)
+  else customers[friendIndex] = friend
+  await writeJson(customersFile, customers)
+
+  await sendTelegramMessage(friend.id, '<b>Codice amico attivato</b>\nHai ricevuto +60 XP e 5% sul primo ordine fino a 300g.')
+  await sendTelegramMessage(owner.id, '<b>Codice amico usato</b>\nHai ricevuto +80 XP nel CAMPO Circle.')
+  res.json({ ok: true, referralXp: friend.referralXp, discountAvailable: true })
+})
+
 app.post('/api/auth/dev-login', (req, res) => {
   if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_LOGIN !== '1') {
     return res.status(404).json({ error: 'Not found' })
   }
   const user = { id: 'dev-admin', firstName: 'Dev', username: 'admin', role: 'admin' }
   res.cookie('cc_session', signSession(user), { httpOnly: true, sameSite: 'lax', maxAge: 7 * 86400 * 1000 })
+  upsertCustomer(user).catch(error => console.error('Customer save failed:', error.message))
   res.json({ user })
 })
 
@@ -1231,13 +1634,16 @@ app.post('/api/auth/logout', (_req, res) => {
   res.json({ ok: true })
 })
 
-app.get('/api/auth/me', (req, res) => {
-  res.json({ user: readSession(req) })
+app.get('/api/auth/me', async (req, res) => {
+  const user = readSession(req)
+  if (user?.id) await upsertCustomer(user).catch(error => console.error('Customer save failed:', error.message))
+  res.json({ user })
 })
 
 app.get('/api/admin/stats', requireAdmin, async (_req, res) => {
-  const [products, orders, subscribers] = await Promise.all([readJson(productsFile, []), readJson(ordersFile, []), readJson(newsletterSubscribersFile, [])])
+  const [products, orders, subscribers, storedCustomers] = await Promise.all([readJson(productsFile, []), readJson(ordersFile, []), readJson(newsletterSubscribersFile, []), readJson(customersFile, [])])
   const customerIds = new Set([
+    ...storedCustomers.map(customer => String(customer.id || '')).filter(Boolean),
     ...orders.map(order => String(order.customer?.id || '')).filter(Boolean),
     ...subscribers.map(subscriber => String(subscriber.id || '')).filter(Boolean),
   ])
@@ -1252,7 +1658,7 @@ app.get('/api/admin/stats', requireAdmin, async (_req, res) => {
 })
 
 app.get('/api/admin/customers', requireAdmin, async (_req, res) => {
-  const [orders, subscribers] = await Promise.all([readJson(ordersFile, []), readJson(newsletterSubscribersFile, [])])
+  const [orders, subscribers, storedCustomers] = await Promise.all([readJson(ordersFile, []), readJson(newsletterSubscribersFile, []), readJson(customersFile, [])])
   const customers = new Map()
   const ensureCustomer = customer => {
     const id = String(customer?.id || '').trim()
@@ -1263,6 +1669,8 @@ app.get('/api/admin/customers', requireAdmin, async (_req, res) => {
         firstName: '',
         lastName: '',
         username: '',
+        role: 'customer',
+        manualXp: 0,
         newsletterEnabled: false,
         ordersCount: 0,
         completedOrders: 0,
@@ -1277,7 +1685,16 @@ app.get('/api/admin/customers', requireAdmin, async (_req, res) => {
     record.firstName = record.firstName || String(customer.firstName || '')
     record.lastName = record.lastName || String(customer.lastName || '')
     record.username = record.username || String(customer.username || '')
+    record.role = customer.role || record.role || 'customer'
+    record.manualXp = Math.max(record.manualXp || 0, Number(customer.manualXp || 0))
     return record
+  }
+
+  for (const customer of storedCustomers) {
+    const record = ensureCustomer(customer)
+    if (!record) continue
+    record.firstSeenAt = record.firstSeenAt || customer.firstSeenAt || ''
+    record.lastSeenAt = customer.lastSeenAt || ''
   }
 
   for (const subscriber of subscribers) {
@@ -1303,6 +1720,33 @@ app.get('/api/admin/customers', requireAdmin, async (_req, res) => {
   }
 
   res.json([...customers.values()].sort((a, b) => String(b.lastOrderAt || b.firstSeenAt).localeCompare(String(a.lastOrderAt || a.firstSeenAt))))
+})
+
+app.patch('/api/admin/customers/:id/xp', requireAdmin, async (req, res) => {
+  const id = String(req.params.id || '').trim()
+  const delta = Math.trunc(Number(req.body.delta || 0))
+  if (!id) return res.status(400).json({ error: 'Utente non valido' })
+  if (!Number.isFinite(delta) || delta === 0) return res.status(400).json({ error: 'EXP non valida' })
+
+  const [storedCustomers, orders, subscribers] = await Promise.all([
+    readJson(customersFile, []),
+    readJson(ordersFile, []),
+    readJson(newsletterSubscribersFile, []),
+  ])
+  const existing = storedCustomers.find(item => String(item.id) === id)
+  const fromOrder = orders.find(order => String(order.customer?.id || '') === id)?.customer
+  const fromSubscriber = subscribers.find(item => String(item.id || '') === id)
+  const source = existing || fromOrder || fromSubscriber
+  if (!source?.id) return res.status(404).json({ error: 'Utente non trovato' })
+
+  const index = storedCustomers.findIndex(item => String(item.id) === id)
+  const base = index === -1 ? normalizeCustomerRecord(source) : normalizeCustomerRecord(source, storedCustomers[index])
+  base.manualXp = Math.max(0, Number(base.manualXp || 0) + delta)
+  base.lastSeenAt = new Date().toISOString()
+  if (index === -1) storedCustomers.push(base)
+  else storedCustomers[index] = base
+  await writeJson(customersFile, storedCustomers)
+  res.json(base)
 })
 
 app.get('/api/admin/products', requireAdmin, async (_req, res) => {
@@ -1398,6 +1842,11 @@ app.post('/api/admin/products', requireAdmin, async (req, res) => {
   if (!product.name || Object.keys(product.prices).length === 0) return res.status(400).json({ error: 'Name and prices are required' })
   products.unshift(product)
   await writeJson(productsFile, products)
+  const sent = await notifyEarlyDropCustomers(product)
+  if (sent > 0) {
+    product.earlyDropNotifiedAt = new Date().toISOString()
+    await writeJson(productsFile, products)
+  }
   res.status(201).json(product)
 })
 
@@ -1411,6 +1860,11 @@ app.put('/api/admin/products/:id', requireAdmin, async (req, res) => {
   }
   products[index] = normalizeProduct({ ...req.body, id: nextId }, products[index])
   await writeJson(productsFile, products)
+  const sent = await notifyEarlyDropCustomers(products[index])
+  if (sent > 0) {
+    products[index].earlyDropNotifiedAt = products[index].earlyDropNotifiedAt || new Date().toISOString()
+    await writeJson(productsFile, products)
+  }
   res.json(products[index])
 })
 

@@ -29,11 +29,11 @@ export const FALLBACK_SITE_CONTENT: SiteContent = {
     notificationsPoints: 40,
     recurringCustomerPoints: 80,
     levels: [
-      { id: 'guest', label: 'Guest', minScore: 0, description: 'Accesso base al club.', perks: ['Accesso catalogo', 'Area privata'] },
-      { id: 'member', label: 'Member', minScore: 180, description: 'Cliente verificato con primi vantaggi.', perks: ['Passport storico', 'Notifiche prioritarie'] },
-      { id: 'insider', label: 'Insider', minScore: 420, description: 'Profilo ricorrente con accesso migliorato.', perks: ['Priority processing', 'Private preview'] },
-      { id: 'priority', label: 'Priority', minScore: 760, description: 'Corsia preferenziale sui drop selezionati.', perks: ['Reserved access', 'Fast reorder'] },
-      { id: 'vault', label: 'Vault', minScore: 1200, description: 'Massimo livello CAMPO Circle.', perks: ['Vault drops', 'Accesso riservato'] },
+      { id: 'guest', label: 'Explorer', minScore: 0, description: 'Ingresso nel club con accesso completo al catalogo privato.', perks: ['Accesso al catalogo privato', 'Area personale con storico ordini'], earlyDropAccess: false, freeDeliveryAccess: false, meetupDepositDiscountPct: 0 },
+      { id: 'member', label: 'Resident', minScore: 180, description: 'Profilo verificato con gestione ordini piu fluida.', perks: ['Passaporto ordini aggiornato', 'Notifiche prioritarie su ordini e novita'], earlyDropAccess: false, freeDeliveryAccess: false, meetupDepositDiscountPct: 0 },
+      { id: 'insider', label: 'Insider', minScore: 420, description: 'Cliente ricorrente con vantaggi di velocita sui drop.', perks: ['Accesso anticipato ai nuovi drop', 'Riordino veloce dai tuoi ordini'], earlyDropAccess: true, freeDeliveryAccess: false, meetupDepositDiscountPct: 0 },
+      { id: 'priority', label: 'Priority', minScore: 760, description: 'Corsia preferenziale con priorita alta e delivery inclusa.', perks: ['Accesso anticipato premium', 'Riordino ultra rapido', 'Delivery gratuita'], earlyDropAccess: true, freeDeliveryAccess: true, meetupDepositDiscountPct: 20 },
+      { id: 'vault', label: 'Vault Elite', minScore: 1200, description: 'Livello massimo CAMPO Circle con accesso riservato.', perks: ['Selezioni riservate Vault', 'Accesso anticipato totale', 'Riordino immediato', 'Delivery gratuita prioritaria'], earlyDropAccess: true, freeDeliveryAccess: true, meetupDepositDiscountPct: 20 },
     ],
   },
 }

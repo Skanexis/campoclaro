@@ -306,7 +306,7 @@ export function ProductPage() {
                   {tag}
                 </span>
               ))}
-              {(product.circlePrivateDrop || product.circleMinLevel || Number(product.circleScoreBoost || 0) > 0) && (
+              {product.earlyDropEnabled && (
                 <span
                   style={{
                     padding: '3px 10px',
@@ -324,7 +324,7 @@ export function ProductPage() {
                   }}
                 >
                   <Crown size={12} />
-                  Circle
+                  Early Drop
                 </span>
               )}
             </div>
@@ -353,15 +353,14 @@ export function ProductPage() {
               {product.longDescription}
             </p>
 
-            {(product.circlePrivateDrop || product.circleMinLevel || Number(product.circleScoreBoost || 0) > 0) && (
+            {product.earlyDropEnabled && (
               <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: 'rgba(214,178,94,0.055)', border: '1px solid rgba(214,178,94,0.14)', display: 'grid', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#D6B25E' }}>
-                  <Crown size={14} /> CAMPO Circle
+                  <Crown size={14} /> Early Drop
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {product.circlePrivateDrop && <span style={{ fontSize: '0.68rem', color: 'rgba(245,245,245,0.52)' }}>Private drop</span>}
-                  {product.circleMinLevel && <span style={{ fontSize: '0.68rem', color: 'rgba(245,245,245,0.52)' }}>Accesso: {product.circleMinLevel}</span>}
-                  {Number(product.circleScoreBoost || 0) > 0 && <span style={{ fontSize: '0.68rem', color: '#D6B25E' }}>+{product.circleScoreBoost} score</span>}
+                  <span style={{ fontSize: '0.68rem', color: 'rgba(245,245,245,0.52)' }}>Accesso anticipato Circle</span>
+                  <span style={{ fontSize: '0.68rem', color: '#D6B25E' }}>{product.earlyDropDays || 1} giorni prima</span>
                 </div>
               </div>
             )}

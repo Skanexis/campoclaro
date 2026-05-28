@@ -136,7 +136,7 @@ function ProductCard({ product }: { product: Product }) {
                 {tag}
               </span>
             ))}
-            {product.circlePrivateDrop && (
+            {product.earlyDropEnabled && (
               <span
                 style={{
                   padding: '2px 7px',
@@ -153,7 +153,7 @@ function ProductCard({ product }: { product: Product }) {
                   gap: 4,
                 }}
               >
-                <Crown size={10} /> Circle
+                <Crown size={10} /> Early Drop
               </span>
             )}
           </div>

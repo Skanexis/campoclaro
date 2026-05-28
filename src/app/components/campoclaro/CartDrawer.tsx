@@ -12,9 +12,18 @@ type PaymentMethod = 'crypto' | 'ccpp'
 type CryptoCurrency = 'BTC' | 'ETH' | 'USDT_TRX'
 type Courier = 'UPS' | 'InPost' | 'SEUR' | 'GLS'
 type Step = 'cart' | 'payment' | 'confirm' | 'success'
-type TelegramCustomer = { id: string; firstName?: string; lastName?: string; username?: string }
+type TelegramCustomer = {
+  id: string
+  firstName?: string
+  lastName?: string
+  username?: string
+  freeDeliveryAccess?: boolean
+  meetupDepositDiscountPct?: number
+}
 
 const CCPP_FEE = 50
+const DELIVERY_FEE = 20
+const MEETUP_BASE_DEPOSIT_RATE = 0.25
 const COURIERS: Array<{ id: Courier; subtitle: string }> = [
   { id: 'UPS', subtitle: 'Tracking ufficiale UPS' },
   { id: 'InPost', subtitle: 'Locker e punti InPost' },
@@ -224,9 +233,14 @@ export function CartDrawer() {
 
   const [address, setAddress] = useState({ via: '', city: '', cap: '', notes: '' })
   const itemKey = (item: { id: string; weight: string; strain?: string }) => `${item.id}-${item.weight}-${item.strain || 'default'}`
+  const meetupDepositDiscountPct = Math.min(100, Math.max(0, Number(telegramCustomer?.meetupDepositDiscountPct || 0)))
+  const meetupDepositRate = MEETUP_BASE_DEPOSIT_RATE * (1 - meetupDepositDiscountPct / 100)
+  const meetupDepositRatePctLabel = Number((meetupDepositRate * 100).toFixed(2))
+  const meetupDepositLabel = `Acconto Meetup ${meetupDepositRatePctLabel}%${meetupDepositDiscountPct > 0 ? ` (Circle -${meetupDepositDiscountPct}%)` : ''}`
+  const deliveryFee = delivery === 'ship' && telegramCustomer?.freeDeliveryAccess !== true ? DELIVERY_FEE : 0
   const ccppFee = delivery === 'ship' && payMethod === 'ccpp' ? CCPP_FEE : 0
-  const orderTotal = total + ccppFee
-  const meetupDeposit = Math.max(0, Math.floor(total * 0.25))
+  const orderTotal = total + deliveryFee + ccppFee
+  const meetupDeposit = Math.max(0, Math.round(total * meetupDepositRate))
   const requiresCryptoPayment = delivery === 'meetup' || payMethod === 'crypto'
   const selectedCrypto = {
     ...CRYPTO_WALLETS[cryptoCurrency],
@@ -628,7 +642,7 @@ export function CartDrawer() {
                               }}
                             >
                               <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.5)', lineHeight: 1.6 }}>
-                                Meetup disponibile solo a Barcellona. Per inviare la richiesta è necessario un acconto crypto del 25%: €{meetupDeposit}. Il team ti contatterà su Telegram per luogo e orario.
+                                Meetup disponibile solo a Barcellona. Per inviare la richiesta è necessario un {meetupDepositLabel.toLowerCase()}: €{meetupDeposit}. Il team ti contatterà su Telegram per luogo e orario.
                               </div>
                             </motion.div>
                           )}
@@ -693,7 +707,7 @@ export function CartDrawer() {
                     </div>
                     {delivery === 'meetup' ? (
                       <div style={{ padding: '11px 12px', background: 'rgba(214,178,94,0.08)', border: '1px solid rgba(214,178,94,0.3)', borderRadius: 8, marginBottom: 12 }}>
-                        <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.86rem', color: '#F5F5F5', marginBottom: 4 }}>Acconto Meetup · 25%</div>
+                        <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.86rem', color: '#F5F5F5', marginBottom: 4 }}>{meetupDepositLabel}</div>
                         <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.52)', lineHeight: 1.4 }}>Pagamento crypto richiesto ora: <span style={{ color: '#D6B25E', fontWeight: 700 }}>€{meetupDeposit}</span> su un totale di €{total}.</div>
                       </div>
                     ) : (
@@ -797,6 +811,16 @@ export function CartDrawer() {
                           </span>
                         </div>
                       ))}
+                      {deliveryFee > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)', gap: 12 }}>
+                          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.5)' }}>
+                            Delivery ({courier})
+                          </span>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.8rem', color: '#D6B25E' }}>
+                            €{deliveryFee}
+                          </span>
+                        </div>
+                      )}
                       {ccppFee > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)', gap: 12 }}>
                           <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.5)' }}>
@@ -849,7 +873,7 @@ export function CartDrawer() {
                         </div>
                       ) : (
                         <div style={{ marginBottom: 7, fontFamily: "'Inter', sans-serif", fontSize: '0.76rem', color: 'rgba(245,245,245,0.5)', lineHeight: 1.4 }}>
-                          Acconto crypto obbligatorio per Meetup: 25% del totale, pari a €{meetupDeposit}. Il saldo sarà concordato con il team.
+                          Acconto crypto obbligatorio per Meetup: {meetupDepositLabel}, pari a €{meetupDeposit}. Il saldo sarà concordato con il team.
                         </div>
                       )}
                       {requiresCryptoPayment && (
@@ -866,6 +890,12 @@ export function CartDrawer() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
                           <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.4)' }}>Supplemento CCPP</span>
                           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.8rem', color: '#D6B25E' }}>€{ccppFee}</span>
+                        </div>
+                      )}
+                      {deliveryFee > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
+                          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.4)' }}>Delivery ({courier})</span>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.8rem', color: '#D6B25E' }}>€{deliveryFee}</span>
                         </div>
                       )}
                       <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
@@ -927,9 +957,19 @@ export function CartDrawer() {
                     </div>
                     <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.85rem', color: 'rgba(245,245,245,0.4)', lineHeight: 1.6, maxWidth: 320, margin: '0 auto' }}>
                       {lastOrder?.payment === 'crypto'
-                        ? `${delivery === 'meetup' ? 'Acconto Meetup 25%: ' : ''}Invia esattamente ${lastOrder?.cryptoExpectedAmount || ''} ${lastOrder?.cryptoExpectedUnit || selectedCrypto.label}. Il sistema verifica automaticamente la blockchain.`
+                        ? `${delivery === 'meetup' ? `${lastOrder?.paymentDescription || meetupDepositLabel}: ` : ''}Invia esattamente ${lastOrder?.cryptoExpectedAmount || ''} ${lastOrder?.cryptoExpectedUnit || selectedCrypto.label}. Il sistema verifica automaticamente la blockchain.`
                         : 'Il tuo ordine è stato registrato. Riceverai conferma a breve.'}
                     </div>
+                    {Number(lastOrder?.referralDiscount || 0) > 0 && (
+                      <div style={{ width: 'min(340px, 100%)', margin: '12px auto 0', padding: '9px 10px', borderRadius: 7, border: '1px solid rgba(214,178,94,0.16)', background: 'rgba(214,178,94,0.06)', color: '#D6B25E', fontFamily: "'Inter', sans-serif", fontSize: '0.76rem' }}>
+                        Codice amico applicato: -€{lastOrder?.referralDiscount}
+                      </div>
+                    )}
+                    {lastOrder?.freeDelivery && (
+                      <div style={{ width: 'min(340px, 100%)', margin: '10px auto 0', padding: '9px 10px', borderRadius: 7, border: '1px solid rgba(214,178,94,0.16)', background: 'rgba(214,178,94,0.06)', color: '#D6B25E', fontFamily: "'Inter', sans-serif", fontSize: '0.76rem' }}>
+                        Free delivery attiva: {lastOrder.freeDeliveryLevel || 'CAMPO Circle'}
+                      </div>
+                    )}
                     {lastOrder && (
                       <div style={{ width: 'min(340px, 100%)', margin: '18px auto 0', padding: 14, background: 'rgba(214,178,94,0.06)', border: '1px solid rgba(214,178,94,0.22)', borderRadius: 8, textAlign: 'left' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>

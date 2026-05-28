@@ -33,9 +33,8 @@ const EMPTY_PRODUCT: Product & { active?: boolean; originalId?: string } = {
   tags: [],
   gradient: '#0d0d0e',
   glowColor: 'rgba(214,178,94,0.12)',
-  circleMinLevel: '',
-  circleScoreBoost: 0,
-  circlePrivateDrop: false,
+  earlyDropEnabled: false,
+  earlyDropDays: 2,
   active: true,
 }
 
@@ -448,6 +447,7 @@ export function AdminPage() {
   const [stats, setStats] = useState({ products: 0, orders: 0, revenue: 0, pending: 0, newsletterSubscribers: 0, customers: 0 })
   const [orders, setOrders] = useState<Order[]>([])
   const [customers, setCustomers] = useState<AdminCustomer[]>([])
+  const [xpDrafts, setXpDrafts] = useState<Record<string, string>>({})
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, string>>({})
   const [products, setProducts] = useState<(Product & { active?: boolean })[]>([])
   const [siteContent, setSiteContent] = useState<SiteContent>(FALLBACK_SITE_CONTENT)
@@ -469,6 +469,7 @@ export function AdminPage() {
     setStats(statsData)
     setOrders(orderData)
     setCustomers(customerData)
+    setXpDrafts(prev => Object.fromEntries(customerData.map(customer => [customer.id, prev[customer.id] ?? ''])))
     setTrackingDrafts(Object.fromEntries(orderData.map(order => [order.id, order.trackingNumber || ''])))
     setProducts(productData)
     setSiteContent(contentData)
@@ -493,7 +494,7 @@ export function AdminPage() {
     if (orderFilter === 'paid') return order.paymentStatus === 'paid_reported' || order.paymentStatus === 'paid_confirmed'
     if (orderFilter === 'meetup') return order.delivery === 'meetup'
     return order.status === orderFilter
-  }), [orders, orderFilter])
+  }).sort((a, b) => Number(b.priorityCheckout === true) - Number(a.priorityCheckout === true)), [orders, orderFilter])
 
   const saveProduct = async () => {
     setMessage('')
@@ -510,9 +511,8 @@ export function AdminPage() {
       ),
       strains: (editing.strains || []).map(item => item.trim()).filter(Boolean),
       tags: (editing.tags || []).map(item => item.trim()).filter(Boolean).slice(0, 2),
-      circleMinLevel: String(editing.circleMinLevel || '').trim(),
-      circleScoreBoost: Math.max(0, Number(editing.circleScoreBoost || 0)),
-      circlePrivateDrop: editing.circlePrivateDrop === true,
+      earlyDropEnabled: editing.earlyDropEnabled === true,
+      earlyDropDays: Math.min(30, Math.max(1, Math.trunc(Number(editing.earlyDropDays || 1)))),
     }
     if (Object.keys(cleanProduct.prices).length === 0) {
       setMessage('Inserisci i prezzi, ad esempio: 100g: 500, 500g: 2400')
@@ -614,7 +614,7 @@ export function AdminPage() {
   }
 
   const startNewProduct = () => {
-    setEditing({ ...EMPTY_PRODUCT, prices: {}, strains: [], tags: [], circleMinLevel: '', circleScoreBoost: 0, circlePrivateDrop: false })
+    setEditing({ ...EMPTY_PRODUCT, prices: {}, strains: [], tags: [], earlyDropEnabled: false, earlyDropDays: 2 })
     setPricesInput('')
     setRemovedMedia([])
     setPriceEditorVersion(version => version + 1)
@@ -700,6 +700,23 @@ export function AdminPage() {
       setMessage(err instanceof Error ? err.message : 'Invio newsletter non riuscito')
     } finally {
       setNewsletterSending(false)
+    }
+  }
+
+  const adjustCustomerXp = async (id: string) => {
+    const delta = Math.trunc(Number(xpDrafts[id] || 0))
+    if (!Number.isFinite(delta) || delta === 0) {
+      setMessage('Inserisci EXP valida.')
+      return
+    }
+    setMessage('')
+    try {
+      await api.adjustCustomerXp(id, delta)
+      setXpDrafts(prev => ({ ...prev, [id]: '' }))
+      setMessage(delta > 0 ? `EXP aggiunta: +${delta}` : `EXP aggiornata: ${delta}`)
+      await loadAdmin()
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Aggiornamento EXP non riuscito')
     }
   }
 
@@ -817,7 +834,9 @@ export function AdminPage() {
                 {filteredOrders.map(order => {
                   const isMeetup = order.delivery === 'meetup'
                   const customerName = [order.customer?.firstName, order.customer?.lastName].filter(Boolean).join(' ') || 'Cliente'
-                  const paymentLabel = isMeetup && order.payment === 'crypto' ? 'Acconto crypto 25%' : order.payment === 'crypto' ? 'Crypto' : order.payment === 'ccpp' ? 'CCPP' : order.payment
+                  const paymentLabel = isMeetup && order.payment === 'crypto'
+                    ? (order.paymentDescription || 'Acconto crypto Meetup')
+                    : order.payment === 'crypto' ? 'Crypto' : order.payment === 'ccpp' ? 'CCPP' : order.payment
                   const cryptoPaidEur = Number(order.cryptoPaidEur || 0)
                   const paymentDueEur = Number(order.paymentDueEur ?? order.total)
                   const paymentRemainingEur = Math.max(0, paymentDueEur - cryptoPaidEur)
@@ -844,7 +863,7 @@ export function AdminPage() {
                       </header>
 
                       <div className="admin-order-tags" style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 14 }}>
-                        {[isMeetup ? 'Meetup' : 'Spedizione', paymentLabel, order.notificationsEnabled === false ? 'Notifiche off' : 'Notifiche on'].map(label => (
+                        {[order.priorityCheckout ? `Priority ${order.priorityLevel || 'Circle'}` : '', order.freeDelivery ? `Free delivery ${order.freeDeliveryLevel || ''}` : '', isMeetup ? 'Meetup' : 'Spedizione', paymentLabel, order.notificationsEnabled === false ? 'Notifiche off' : 'Notifiche on'].filter(Boolean).map(label => (
                           <span key={label} style={{ padding: '5px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(245,245,245,0.54)', fontFamily: "'Inter', sans-serif", fontSize: '0.68rem' }}>
                             {label}
                           </span>
@@ -880,7 +899,9 @@ export function AdminPage() {
                               </span>
                             </div>
                           ))}
-                          {Number(order.fees || 0) > 0 && <div className="admin-order-muted">Supplemento CCPP: €{order.fees}</div>}
+                          {Number(order.referralDiscount || 0) > 0 && <div className="admin-order-muted">Codice amico: -€{order.referralDiscount}</div>}
+                          {Number(order.deliveryFee || 0) > 0 && <div className="admin-order-muted">Delivery: €{order.deliveryFee}</div>}
+                          {Number(order.ccppFee || order.fees || 0) > 0 && <div className="admin-order-muted">Supplemento CCPP: €{order.ccppFee || order.fees}</div>}
                         </section>
                       </div>
 
@@ -1114,31 +1135,19 @@ export function AdminPage() {
                   </div>
                 </AdminFormBlock>
 
-                <AdminFormBlock title="CAMPO Circle" className="admin-form-block-wide">
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px auto', gap: 10, alignItems: 'end' }} className="admin-form">
-                    <label style={{ display: 'block' }}>
-                      <span style={{ display: 'block', marginBottom: 7, fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.35)' }}>
-                        Livello minimo
-                      </span>
-                      <select
-                        value={editing.circleMinLevel || ''}
-                        onChange={event => setEditing(p => ({ ...p, circleMinLevel: event.target.value }))}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 6, background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.12)', color: '#F5F5F5' }}
-                      >
-                        <option value="" style={{ background: '#0f0f10' }}>Nessun limite</option>
-                        {siteContent.circle.levels.map(level => (
-                          <option key={level.id} value={level.id} style={{ background: '#0f0f10' }}>{level.label}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <Field label="Score bonus" value={String(editing.circleScoreBoost || 0)} onChange={v => setEditing(p => ({ ...p, circleScoreBoost: Number(v) || 0 }))} />
+                <AdminFormBlock title="Early Drop" className="admin-form-block-wide">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 140px 1fr', gap: 10, alignItems: 'end' }} className="admin-form">
                     <button
                       type="button"
-                      onClick={() => setEditing(p => ({ ...p, circlePrivateDrop: !p.circlePrivateDrop }))}
-                      style={{ height: 39, padding: '0 12px', borderRadius: 6, border: editing.circlePrivateDrop ? '1px solid rgba(214,178,94,0.45)' : '1px solid rgba(255,255,255,0.1)', background: editing.circlePrivateDrop ? 'rgba(214,178,94,0.1)' : 'rgba(255,255,255,0.03)', color: editing.circlePrivateDrop ? '#D6B25E' : 'rgba(245,245,245,0.55)', cursor: 'pointer' }}
+                      onClick={() => setEditing(p => ({ ...p, earlyDropEnabled: !p.earlyDropEnabled }))}
+                      style={{ height: 39, padding: '0 12px', borderRadius: 6, border: editing.earlyDropEnabled ? '1px solid rgba(214,178,94,0.45)' : '1px solid rgba(255,255,255,0.1)', background: editing.earlyDropEnabled ? 'rgba(214,178,94,0.1)' : 'rgba(255,255,255,0.03)', color: editing.earlyDropEnabled ? '#D6B25E' : 'rgba(245,245,245,0.55)', cursor: 'pointer', fontWeight: 800 }}
                     >
-                      Private drop
+                      {editing.earlyDropEnabled ? 'Early Drop ON' : 'Early Drop OFF'}
                     </button>
+                    <Field label="Giorni" value={String(editing.earlyDropDays || 2)} onChange={v => setEditing(p => ({ ...p, earlyDropDays: Math.min(30, Math.max(1, Number(v) || 1)) }))} />
+                    <div style={{ color: 'rgba(245,245,245,0.38)', fontSize: '0.74rem', lineHeight: 1.45 }}>
+                      Il prodotto sara visibile in anticipo solo ai livelli Circle con privilegio Early Drop. Telegram avvisa automaticamente gli utenti abilitati.
+                    </div>
                   </div>
                 </AdminFormBlock>
 
@@ -1243,13 +1252,13 @@ export function AdminPage() {
                   const displayName = [customer.firstName, customer.lastName].filter(Boolean).join(' ').trim() || customer.username || 'Utente'
                   return (
                     <article key={customer.id} className="admin-user-card" style={{ ...panel, padding: 14 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 0.8fr 1fr', gap: 12, alignItems: 'center' }} className="admin-user-row">
+                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.7fr 0.7fr 0.8fr 1fr', gap: 12, alignItems: 'center' }} className="admin-user-row">
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 800, color: '#F5F5F5', marginBottom: 4, overflowWrap: 'anywhere' }}>
                             {displayName}
                           </div>
                           <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.42)', overflowWrap: 'anywhere' }}>
-                            {customer.username ? `@${customer.username}` : 'Username non disponibile'}
+                            {customer.username ? `@${customer.username}` : 'Username non disponibile'} · {customer.role || 'customer'}
                           </div>
                           <div style={{ marginTop: 4, fontFamily: "'JetBrains Mono', monospace", fontSize: '0.68rem', color: 'rgba(245,245,245,0.32)', overflowWrap: 'anywhere' }}>
                             ID {customer.id}
@@ -1268,6 +1277,28 @@ export function AdminPage() {
                             €{customer.totalSpent}
                           </div>
                           <div className="admin-order-muted">{customer.newsletterEnabled ? 'Newsletter ON' : 'Newsletter OFF'}</div>
+                        </div>
+                        <div>
+                          <div className="admin-order-label">EXP manuale</div>
+                          <div style={{ fontFamily: "'JetBrains Mono', monospace", color: '#D6B25E', fontWeight: 800 }}>
+                            {customer.manualXp || 0}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, marginTop: 7 }}>
+                            <input
+                              type="number"
+                              value={xpDrafts[customer.id] || ''}
+                              onChange={event => setXpDrafts(prev => ({ ...prev, [customer.id]: event.target.value }))}
+                              placeholder="+EXP"
+                              style={{ width: 78, minWidth: 0, padding: '7px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: '#101011', color: '#F5F5F5', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.72rem' }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => adjustCustomerXp(customer.id)}
+                              style={{ padding: '7px 9px', borderRadius: 6, border: '1px solid rgba(214,178,94,0.22)', background: 'rgba(214,178,94,0.09)', color: '#D6B25E', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800 }}
+                            >
+                              Dai
+                            </button>
+                          </div>
                         </div>
                         <div style={{ minWidth: 0 }}>
                           <div className="admin-order-label">Ultimo ordine</div>
@@ -1327,7 +1358,7 @@ export function AdminPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setSiteContent(p => ({ ...p, circle: { ...p.circle, levels: [...p.circle.levels, { id: `level-${p.circle.levels.length + 1}`, label: 'Nuovo livello', minScore: 0, description: '', perks: [] }] } }))}
+                onClick={() => setSiteContent(p => ({ ...p, circle: { ...p.circle, levels: [...p.circle.levels, { id: `level-${p.circle.levels.length + 1}`, label: 'Nuovo livello', minScore: 0, description: '', perks: [], earlyDropAccess: false, freeDeliveryAccess: false, meetupDepositDiscountPct: 0 }] } }))}
                 style={{ padding: '8px 12px', background: 'rgba(214,178,94,0.08)', border: '1px solid rgba(214,178,94,0.24)', borderRadius: 6, color: '#D6B25E', cursor: 'pointer' }}
               >
                 + Livello
@@ -1336,9 +1367,28 @@ export function AdminPage() {
             <div style={{ display: 'grid', gap: 12 }}>
               {siteContent.circle.levels.map((level, index) => (
                 <div key={`circle-level-${index}`} className="admin-circle-level-card" style={{ ...panel, padding: 14 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px auto', gap: 12, alignItems: 'end' }} className="admin-form">
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 140px auto auto auto', gap: 12, alignItems: 'end' }} className="admin-form">
                     <Field label="Nome livello" value={level.label} onChange={value => updateCircleLevel(index, { label: value })} />
                     <Field label="Score minimo" value={String(level.minScore)} onChange={value => updateCircleLevel(index, { minScore: Number(value) || 0 })} />
+                    <Field
+                      label="Sconto Meetup %"
+                      value={String(level.meetupDepositDiscountPct || 0)}
+                      onChange={value => updateCircleLevel(index, { meetupDepositDiscountPct: Math.min(100, Math.max(0, Number(value) || 0)) })}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => updateCircleLevel(index, { earlyDropAccess: !level.earlyDropAccess })}
+                      style={{ height: 39, padding: '0 12px', borderRadius: 6, border: level.earlyDropAccess ? '1px solid rgba(214,178,94,0.45)' : '1px solid rgba(255,255,255,0.1)', background: level.earlyDropAccess ? 'rgba(214,178,94,0.1)' : 'rgba(255,255,255,0.03)', color: level.earlyDropAccess ? '#D6B25E' : 'rgba(245,245,245,0.55)', cursor: 'pointer' }}
+                    >
+                      Early Drop
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateCircleLevel(index, { freeDeliveryAccess: !level.freeDeliveryAccess })}
+                      style={{ height: 39, padding: '0 12px', borderRadius: 6, border: level.freeDeliveryAccess ? '1px solid rgba(214,178,94,0.45)' : '1px solid rgba(255,255,255,0.1)', background: level.freeDeliveryAccess ? 'rgba(214,178,94,0.1)' : 'rgba(255,255,255,0.03)', color: level.freeDeliveryAccess ? '#D6B25E' : 'rgba(245,245,245,0.55)', cursor: 'pointer' }}
+                    >
+                      Free delivery
+                    </button>
                     <button
                       type="button"
                       onClick={() => setSiteContent(p => ({ ...p, circle: { ...p.circle, levels: p.circle.levels.filter((_, i) => i !== index) } }))}

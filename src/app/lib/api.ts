@@ -7,7 +7,6 @@ export interface OrderItem {
   strain?: string
   price: number
   quantity: number
-  circleScoreBoost?: number
 }
 
 export interface Order {
@@ -42,6 +41,13 @@ export interface Order {
     username?: string
   }
   notificationsEnabled?: boolean
+  priorityCheckout?: boolean
+  priorityLevel?: string
+  freeDelivery?: boolean
+  freeDeliveryLevel?: string
+  deliveryFee?: number
+  ccppFee?: number
+  meetupDepositDiscountPct?: number
   trackingNumber?: string
   trackingProvider?: string
   trackingUrl?: string
@@ -51,6 +57,9 @@ export interface Order {
   address: Record<string, string>
   items: Array<OrderItem & { productId?: string }>
   subtotal?: number
+  referralDiscount?: number
+  referralDiscountCode?: string
+  referralDiscountWeightGrams?: number
   fees?: number
   total: number
   circleScoreAward?: number
@@ -63,6 +72,8 @@ export interface AdminCustomer {
   firstName: string
   lastName: string
   username: string
+  role: string
+  manualXp: number
   newsletterEnabled: boolean
   ordersCount: number
   completedOrders: number
@@ -87,7 +98,7 @@ export interface SiteContent {
     paymentVerifiedPoints: number
     notificationsPoints: number
     recurringCustomerPoints: number
-    levels: Array<{ id: string; label: string; minScore: number; description: string; perks: string[] }>
+    levels: Array<{ id: string; label: string; minScore: number; description: string; perks: string[]; earlyDropAccess?: boolean; freeDeliveryAccess?: boolean; meetupDepositDiscountPct?: number }>
   }
 }
 
@@ -179,15 +190,22 @@ export const api = {
   beginCustomerTelegramLogin: () => request<TelegramLoginStart>('/api/customer/telegram/start', { method: 'POST', body: JSON.stringify({}) }),
   pollCustomerTelegramLogin: (requestId: string) => request<TelegramLoginStatus>(`/api/customer/telegram/status/${requestId}`),
   customerMe: () =>
-    request<{ user: null | { id: string; firstName?: string; lastName?: string; username?: string; photoUrl?: string; role?: string } }>('/api/customer/me'),
+    request<{ user: null | { id: string; firstName?: string; lastName?: string; username?: string; photoUrl?: string; role?: string; circleManualXp?: number; referralXp?: number; referralCode?: string; referredBy?: string; referralDiscountAvailable?: boolean; referralDiscountUsedAt?: string; circleLevelId?: string; circleLevelLabel?: string; freeDeliveryAccess?: boolean; meetupDepositDiscountPct?: number } }>('/api/customer/me'),
   customerOrders: () => request<Order[]>('/api/customer/orders'),
   devLogin: () => request('/api/auth/dev-login', { method: 'POST', body: JSON.stringify({}) }),
   logout: () => request('/api/auth/logout', { method: 'POST', body: JSON.stringify({}) }),
   newsletterPreference: () => request<{ enabled: boolean }>('/api/customer/newsletter'),
   saveNewsletterPreference: (enabled: boolean) =>
     request<{ enabled: boolean }>('/api/customer/newsletter', { method: 'PUT', body: JSON.stringify({ enabled }) }),
+  customerReferral: () =>
+    request<{ code: string; canCreate: boolean; referredBy: string; referralXp: number; discountAvailable: boolean; discountUsedAt: string }>('/api/customer/referral'),
+  createReferralCode: () => request<{ code: string }>('/api/customer/referral/code', { method: 'POST', body: JSON.stringify({}) }),
+  applyReferralCode: (code: string) =>
+    request<{ ok: boolean; referralXp: number; discountAvailable: boolean }>('/api/customer/referral/apply', { method: 'POST', body: JSON.stringify({ code }) }),
   adminStats: () => request<{ products: number; orders: number; revenue: number; pending: number; newsletterSubscribers?: number; customers?: number }>('/api/admin/stats'),
   adminCustomers: () => request<AdminCustomer[]>('/api/admin/customers'),
+  adjustCustomerXp: (id: string, delta: number) =>
+    request<AdminCustomer>(`/api/admin/customers/${encodeURIComponent(id)}/xp`, { method: 'PATCH', body: JSON.stringify({ delta }) }),
   adminProducts: () => request<Product[]>('/api/admin/products'),
   adminSiteContent: () => request<SiteContent>('/api/admin/site-content'),
   saveSiteContent: (content: SiteContent) =>
