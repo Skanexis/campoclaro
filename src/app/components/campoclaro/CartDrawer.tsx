@@ -5,7 +5,6 @@ import { X, Plus, Minus, Trash2, Truck, MapPin, ChevronRight, Check, ArrowLeft, 
 import { useCart } from '../../context/CartContext'
 import { api, type Order } from '../../lib/api'
 import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
-import { TelegramStartLogin } from './TelegramStartLogin'
 import { CryptoPaymentModal } from './CryptoPaymentModal'
 
 type DeliveryMethod = 'ship' | 'meetup'
@@ -56,7 +55,7 @@ function FloatingInput({
   const hasValue = value.length > 0
 
   return (
-    <div style={{ position: 'relative', marginBottom: 12 }}>
+    <div style={{ position: 'relative', marginBottom: 8 }}>
       <input
         type={type}
         value={value}
@@ -65,7 +64,7 @@ function FloatingInput({
         onBlur={() => setFocused(false)}
         style={{
           width: '100%',
-          padding: '15px 12px 7px',
+          padding: '13px 11px 6px',
           background: 'rgba(255,255,255,0.03)',
           border: `1px solid ${focused ? 'rgba(214,178,94,0.5)' : 'rgba(255,255,255,0.08)'}`,
           borderRadius: 6,
@@ -80,9 +79,9 @@ function FloatingInput({
       <label style={{
         position: 'absolute',
         left: 14,
-        top: focused || hasValue ? 5 : 12,
+        top: focused || hasValue ? 4 : 10,
         fontFamily: "'Inter', sans-serif",
-        fontSize: focused || hasValue ? '0.65rem' : '0.85rem',
+        fontSize: focused || hasValue ? '0.6rem' : '0.8rem',
         letterSpacing: focused || hasValue ? '0.1em' : '0.02em',
         textTransform: focused || hasValue ? 'uppercase' : 'none',
         color: focused ? '#D6B25E' : 'rgba(245,245,245,0.3)',
@@ -125,7 +124,7 @@ function DeliveryCard({
       onClick={onSelect}
       style={{
         flex: 1,
-        padding: '12px',
+        padding: '10px',
         background: selected ? 'rgba(214,178,94,0.07)' : 'rgba(255,255,255,0.02)',
         border: selected ? '1px solid rgba(214,178,94,0.4)' : '1px solid rgba(255,255,255,0.07)',
         borderRadius: 8,
@@ -134,13 +133,13 @@ function DeliveryCard({
         transition: 'all 0.2s ease',
       }}
     >
-      <div style={{ color: selected ? '#D6B25E' : 'rgba(245,245,245,0.4)', marginBottom: 5 }}>
+      <div style={{ color: selected ? '#D6B25E' : 'rgba(245,245,245,0.4)', marginBottom: 4 }}>
         {info.icon}
       </div>
-      <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: '0.9rem', fontWeight: 700, color: selected ? '#F5F5F5' : 'rgba(245,245,245,0.6)', marginBottom: 4 }}>
+      <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: '0.84rem', fontWeight: 700, color: selected ? '#F5F5F5' : 'rgba(245,245,245,0.6)', marginBottom: 3 }}>
         {info.title}
       </div>
-      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.3)', lineHeight: 1.4 }}>
+      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.68rem', color: 'rgba(245,245,245,0.3)', lineHeight: 1.3 }}>
         {info.subtitle}
       </div>
     </motion.button>
@@ -168,7 +167,7 @@ function PaymentCard({
       onClick={onSelect}
       style={{
         width: '100%',
-        padding: '12px 14px',
+        padding: '10px 12px',
         background: selected ? 'rgba(214,178,94,0.07)' : 'rgba(255,255,255,0.02)',
         border: selected ? '1px solid rgba(214,178,94,0.4)' : '1px solid rgba(255,255,255,0.07)',
         borderRadius: 8,
@@ -177,15 +176,15 @@ function PaymentCard({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 10,
+        marginBottom: 8,
         transition: 'all 0.2s ease',
       }}
     >
       <div>
-        <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.9rem', color: '#F5F5F5', marginBottom: 3 }}>
+        <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.84rem', color: '#F5F5F5', marginBottom: 2 }}>
           {label}
         </div>
-        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.35)' }}>
+        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.68rem', color: 'rgba(245,245,245,0.35)' }}>
           {subtitle}
         </div>
       </div>
@@ -287,7 +286,7 @@ export function CartDrawer() {
   const handleCheckout = () => {
     setOrderError('')
     if (!telegramCustomer) {
-      setOrderError("Accedi con Telegram per completare l'ordine.")
+      setOrderError("Sessione Telegram non trovata. Accedi dal sito e riapri il checkout.")
       return
     }
     if (delivery === 'ship' && (!address.via.trim() || !address.city.trim() || !address.cap.trim())) {
@@ -454,7 +453,7 @@ export function CartDrawer() {
             )}
 
             {/* Content */}
-            <div className="cc-drawer-scroll" style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+            <div className="cc-drawer-scroll" style={{ flex: 1, overflowY: 'auto', padding: '18px 20px' }}>
               <AnimatePresence mode="wait">
                 {/* CART STEP */}
                 {step === 'cart' && (
@@ -472,7 +471,7 @@ export function CartDrawer() {
                     ) : (
                       <>
                         {/* Items */}
-                        <div style={{ marginBottom: 28 }}>
+                        <div style={{ marginBottom: 16 }}>
                           {items.map(item => (
                             <motion.div
                               className="cc-cart-item"
@@ -484,14 +483,14 @@ export function CartDrawer() {
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: 16,
-                                padding: '14px 0',
+                                gap: 12,
+                                padding: '10px 0',
                                 borderBottom: '1px solid rgba(255,255,255,0.05)',
                               }}
                             >
                               <div style={{
-                                width: 44,
-                                height: 44,
+                                width: 36,
+                                height: 36,
                                 borderRadius: 6,
                                 background: 'rgba(214,178,94,0.08)',
                                 border: '1px solid rgba(214,178,94,0.12)',
@@ -534,8 +533,8 @@ export function CartDrawer() {
                         </div>
 
                         {/* Delivery Method */}
-                        <div style={{ marginBottom: 24 }}>
-                          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 12 }}>
+                        <div style={{ marginBottom: 14 }}>
+                          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 8 }}>
                             Modalità di consegna
                           </div>
                           <div className="cc-cart-delivery" style={{ display: 'flex', gap: 10 }}>
@@ -548,19 +547,16 @@ export function CartDrawer() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          gap: 16,
-                          padding: '16px',
+                          gap: 12,
+                          padding: '10px 12px',
                           background: 'rgba(255,255,255,0.02)',
                           border: '1px solid rgba(255,255,255,0.06)',
                           borderRadius: 8,
-                          marginBottom: 20,
+                          marginBottom: 12,
                         }}>
                           <div>
-                            <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.9rem', color: '#F5F5F5', marginBottom: 4 }}>
+                            <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.82rem', color: '#F5F5F5', marginBottom: 2 }}>
                               Notifiche ordine
-                            </div>
-                            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.73rem', color: 'rgba(245,245,245,0.35)', lineHeight: 1.45 }}>
-                              Aggiornamenti solo su questo ordine. Nessuna newsletter o messaggi promozionali.
                             </div>
                             <div style={{ marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                               <Link to="/privacy" onClick={closeCart} style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', color: '#D6B25E', textDecoration: 'none' }}>
@@ -600,34 +596,6 @@ export function CartDrawer() {
                           </button>
                         </div>
 
-                        <div style={{
-                          padding: '16px',
-                          background: telegramCustomer ? 'rgba(214,178,94,0.06)' : 'rgba(255,255,255,0.02)',
-                          border: telegramCustomer ? '1px solid rgba(214,178,94,0.22)' : '1px solid rgba(255,255,255,0.06)',
-                          borderRadius: 8,
-                          marginBottom: 20,
-                        }}>
-                          <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.9rem', color: '#F5F5F5', marginBottom: 6 }}>
-                            Accesso Telegram
-                          </div>
-                          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.73rem', color: 'rgba(245,245,245,0.38)', lineHeight: 1.45, marginBottom: telegramCustomer ? 0 : 12 }}>
-                            Obbligatorio per ordinare. Useremo il tuo account Telegram per conferma, pagamento e tracking.
-                          </div>
-                          {telegramCustomer ? (
-                            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: '#D6B25E' }}>
-                              Autorizzato: {telegramCustomer.username ? `@${telegramCustomer.username}` : [telegramCustomer.firstName, telegramCustomer.lastName].filter(Boolean).join(' ')}
-                            </div>
-                          ) : (
-                            <TelegramStartLogin
-                              compact
-                              scope="customer"
-                              onAuthenticated={user => {
-                                if (user) setTelegramCustomer(user)
-                              }}
-                            />
-                          )}
-                        </div>
-
                         {/* Address Form / Meetup Info */}
                         <AnimatePresence>
                           {delivery === 'ship' && (
@@ -639,7 +607,7 @@ export function CartDrawer() {
                               style={{ overflow: 'hidden', marginBottom: 8 }}
                             >
                               <FloatingInput label="Via e numero civico" value={address.via} onChange={v => setAddress(a => ({ ...a, via: v }))} />
-                              <div className="cc-cart-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                              <div className="cc-cart-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                                 <FloatingInput label="Città" value={address.city} onChange={v => setAddress(a => ({ ...a, city: v }))} />
                                 <FloatingInput label="CAP" value={address.cap} onChange={v => setAddress(a => ({ ...a, cap: v }))} />
                               </div>
@@ -652,11 +620,11 @@ export function CartDrawer() {
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: 10 }}
                               style={{
-                                padding: '16px',
+                                padding: '12px',
                                 background: 'rgba(255,255,255,0.02)',
                                 border: '1px solid rgba(255,255,255,0.06)',
                                 borderRadius: 8,
-                                marginBottom: 20,
+                                marginBottom: 12,
                               }}
                             >
                               <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.5)', lineHeight: 1.6 }}>
@@ -666,8 +634,8 @@ export function CartDrawer() {
                           )}
                         </AnimatePresence>
                         {delivery === 'ship' && (
-                          <div style={{ marginBottom: 22 }}>
-                            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 12 }}>
+                          <div style={{ marginBottom: 14 }}>
+                            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 8 }}>
                               Corriere
                             </div>
                             <div className="cc-cart-couriers" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
@@ -679,7 +647,7 @@ export function CartDrawer() {
                                     type="button"
                                     onClick={() => setCourier(option.id)}
                                     style={{
-                                      padding: '13px 14px',
+                                    padding: '9px 11px',
                                       background: selected ? 'rgba(214,178,94,0.09)' : 'rgba(255,255,255,0.025)',
                                       border: selected ? '1px solid rgba(214,178,94,0.45)' : '1px solid rgba(255,255,255,0.07)',
                                       borderRadius: 8,
@@ -689,10 +657,10 @@ export function CartDrawer() {
                                       fontFamily: "'Inter', sans-serif",
                                     }}
                                   >
-                                    <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.88rem', color: selected ? '#D6B25E' : '#F5F5F5', marginBottom: 3 }}>
+                                    <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.82rem', color: selected ? '#D6B25E' : '#F5F5F5', marginBottom: 2 }}>
                                       {option.id}
                                     </div>
-                                    <div style={{ fontSize: '0.7rem', color: 'rgba(245,245,245,0.34)', lineHeight: 1.35 }}>
+                                    <div style={{ fontSize: '0.66rem', color: 'rgba(245,245,245,0.34)', lineHeight: 1.3 }}>
                                       {option.subtitle}
                                     </div>
                                   </button>
@@ -720,13 +688,13 @@ export function CartDrawer() {
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ duration: 0.25 }}
                   >
-                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 16 }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 10 }}>
                       Metodo di Pagamento
                     </div>
                     {delivery === 'meetup' ? (
-                      <div style={{ padding: '14px', background: 'rgba(214,178,94,0.08)', border: '1px solid rgba(214,178,94,0.3)', borderRadius: 8, marginBottom: 18 }}>
-                        <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.92rem', color: '#F5F5F5', marginBottom: 5 }}>Acconto Meetup · 25%</div>
-                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.76rem', color: 'rgba(245,245,245,0.52)', lineHeight: 1.5 }}>Pagamento crypto richiesto ora: <span style={{ color: '#D6B25E', fontWeight: 700 }}>€{meetupDeposit}</span> su un totale di €{total}.</div>
+                      <div style={{ padding: '11px 12px', background: 'rgba(214,178,94,0.08)', border: '1px solid rgba(214,178,94,0.3)', borderRadius: 8, marginBottom: 12 }}>
+                        <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.86rem', color: '#F5F5F5', marginBottom: 4 }}>Acconto Meetup · 25%</div>
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.52)', lineHeight: 1.4 }}>Pagamento crypto richiesto ora: <span style={{ color: '#D6B25E', fontWeight: 700 }}>€{meetupDeposit}</span> su un totale di €{total}.</div>
                       </div>
                     ) : (
                       <>
@@ -736,8 +704,8 @@ export function CartDrawer() {
                     )}
 
                     {requiresCryptoPayment && (
-                      <div style={{ marginTop: 14, marginBottom: 20 }}>
-                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 10 }}>
+                      <div style={{ marginTop: 10, marginBottom: 14 }}>
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 8 }}>
                           Valuta crypto
                         </div>
                         <div className="cc-cart-crypto-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
@@ -752,7 +720,7 @@ export function CartDrawer() {
                                 disabled={busy}
                                 onClick={() => !busy && setCryptoCurrency(currency)}
                                 style={{
-                                  padding: '11px 8px',
+                                  padding: '9px 7px',
                                   background: busy ? 'rgba(229,115,115,0.055)' : selected ? 'rgba(214,178,94,0.1)' : 'rgba(255,255,255,0.025)',
                                   border: busy ? '1px solid rgba(229,115,115,0.22)' : selected ? '1px solid rgba(214,178,94,0.45)' : '1px solid rgba(255,255,255,0.07)',
                                   borderRadius: 6,
@@ -763,16 +731,16 @@ export function CartDrawer() {
                                   opacity: busy ? 0.72 : 1,
                                 }}
                               >
-                                <div style={{ fontWeight: 700, fontSize: '0.82rem' }}>{wallet.label}</div>
-                                <div style={{ fontSize: '0.66rem', marginTop: 3, color: busy ? '#E57373' : 'rgba(245,245,245,0.34)' }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.78rem' }}>{wallet.label}</div>
+                                <div style={{ fontSize: '0.62rem', marginTop: 2, color: busy ? '#E57373' : 'rgba(245,245,245,0.34)' }}>
                                   {busy ? 'Busy' : wallet.network}
                                 </div>
                               </button>
                             )
                           })}
                         </div>
-                        <div style={{ marginTop: 12, padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8 }}>
-                          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.35)', marginBottom: 7 }}>
+                        <div style={{ marginTop: 9, padding: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8 }}>
+                          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.68rem', color: 'rgba(245,245,245,0.35)', marginBottom: 6 }}>
                             Wallet {selectedCrypto.label} ({selectedCrypto.network})
                           </div>
                           <button
@@ -785,7 +753,7 @@ export function CartDrawer() {
                               alignItems: 'center',
                               justifyContent: 'space-between',
                               gap: 10,
-                              padding: '10px 12px',
+                              padding: '8px 10px',
                               background: 'rgba(0,0,0,0.18)',
                               border: '1px solid rgba(255,255,255,0.06)',
                               borderRadius: 6,
@@ -810,13 +778,13 @@ export function CartDrawer() {
                     )}
 
                     <div style={{
-                      marginTop: 24,
-                      padding: '16px',
+                      marginTop: 14,
+                      padding: '12px',
                       background: 'rgba(255,255,255,0.02)',
                       border: '1px solid rgba(255,255,255,0.05)',
                       borderRadius: 8,
                     }}>
-                      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.35)', marginBottom: 8 }}>
+                      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.68rem', color: 'rgba(245,245,245,0.35)', marginBottom: 7 }}>
                         Riepilogo ordine
                       </div>
                       {items.map(item => (
@@ -852,40 +820,40 @@ export function CartDrawer() {
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ duration: 0.25 }}
                   >
-                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 16 }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 10 }}>
                       Conferma Ordine
                     </div>
                     <div style={{
-                      padding: '16px',
+                      padding: '12px',
                       background: 'rgba(214,178,94,0.04)',
                       border: '1px solid rgba(214,178,94,0.12)',
                       borderRadius: 8,
-                      marginBottom: 16,
+                      marginBottom: 10,
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
                         <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.4)' }}>Consegna</span>
                         <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: '#F5F5F5' }}>{delivery === 'ship' ? 'Spedizione' : 'Meetup Barcellona'}</span>
                       </div>
                       {delivery === 'ship' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
                           <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.4)' }}>Corriere</span>
                           <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: '#F5F5F5' }}>{courier}</span>
                         </div>
                       )}
                       {delivery === 'ship' ? (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
                           <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.4)' }}>Pagamento</span>
                           <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: '#F5F5F5' }}>
                             {payMethod === 'crypto' ? `Crypto (${selectedCrypto.label})` : 'CCPP'}
                           </span>
                         </div>
                       ) : (
-                        <div style={{ marginBottom: 10, fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.5)', lineHeight: 1.5 }}>
+                        <div style={{ marginBottom: 7, fontFamily: "'Inter', sans-serif", fontSize: '0.76rem', color: 'rgba(245,245,245,0.5)', lineHeight: 1.4 }}>
                           Acconto crypto obbligatorio per Meetup: 25% del totale, pari a €{meetupDeposit}. Il saldo sarà concordato con il team.
                         </div>
                       )}
                       {requiresCryptoPayment && (
-                        <div style={{ marginBottom: 10 }}>
+                        <div style={{ marginBottom: 7 }}>
                           <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.4)', marginBottom: 6 }}>
                             Wallet
                           </div>
@@ -895,16 +863,16 @@ export function CartDrawer() {
                         </div>
                       )}
                       {ccppFee > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
                           <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.4)' }}>Supplemento CCPP</span>
                           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.8rem', color: '#D6B25E' }}>€{ccppFee}</span>
                         </div>
                       )}
-                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10, display: 'flex', justifyContent: 'space-between' }}>
+                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.9rem', color: '#F5F5F5' }}>Totale</span>
                         <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '1rem', fontWeight: 700, color: '#D6B25E' }}>€{orderTotal}</span>
                       </div>
-                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 10, paddingTop: 10, display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                         <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.4)' }}>Notifiche</span>
                         <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: notificationsEnabled ? '#D6B25E' : 'rgba(245,245,245,0.45)' }}>
                           {notificationsEnabled ? 'Attive' : 'Disattivate'}
@@ -915,7 +883,7 @@ export function CartDrawer() {
                       fontFamily: "'Inter', sans-serif",
                       fontSize: '0.72rem',
                       color: 'rgba(245,245,245,0.25)',
-                      lineHeight: 1.6,
+                      lineHeight: 1.45,
                     }}>
                       Confermando l'ordine accetti le condizioni del servizio. Riceverai le istruzioni tramite canale privato.
                     </div>
@@ -999,12 +967,12 @@ export function CartDrawer() {
             {/* Footer */}
             {items.length > 0 && step !== 'success' && (
               <div className="cc-cart-footer" style={{
-                padding: '20px 24px',
+                padding: '14px 20px',
                 borderTop: '1px solid rgba(255,255,255,0.05)',
                 flexShrink: 0,
                 background: 'rgba(5,5,5,0.8)',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <span style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.8rem', color: 'rgba(245,245,245,0.4)' }}>Totale</span>
                   <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '1.1rem', fontWeight: 700, color: '#D6B25E' }}>
                     €{orderTotal}
@@ -1017,7 +985,7 @@ export function CartDrawer() {
                   disabled={submitting}
                   style={{
                     width: '100%',
-                    padding: '14px',
+                    padding: '12px',
                     background: 'linear-gradient(135deg, #D6B25E, #F0C96A)',
                     color: '#050505',
                     border: 'none',

@@ -331,21 +331,21 @@ export function ProfilePage() {
   ]
 
   return (
-    <div className="cc-profile-page" style={{ minHeight: '100vh', paddingTop: 72 }}>
-      <div className="profile-container" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px 80px' }}>
+    <div className="cc-profile-page" style={{ height: '100dvh', paddingTop: 72, overflow: 'hidden' }}>
+      <div className="profile-container" style={{ maxWidth: 1100, height: '100%', margin: '0 auto', padding: '22px 24px 18px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="profile-header"
-          style={{ marginBottom: 40, display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 16 }}
+          style={{ marginBottom: 18, display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 16, flexShrink: 0 }}
         >
           <div>
             <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: '#D6B25E', marginBottom: 10 }}>
               Area Privata
             </div>
-            <h1 className="profile-title" style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', fontWeight: 700, color: '#F5F5F5', letterSpacing: '-0.02em', lineHeight: 1.1, margin: 0 }}>
+            <h1 className="profile-title" style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 'clamp(1.45rem, 3vw, 2rem)', fontWeight: 700, color: '#F5F5F5', letterSpacing: '-0.02em', lineHeight: 1.05, margin: 0 }}>
               Dashboard
             </h1>
           </div>
@@ -362,7 +362,7 @@ export function ProfilePage() {
         </motion.div>
 
         {/* Layout */}
-        <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 32 }} className="profile-grid">
+        <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 18, flex: '1 1 auto', minHeight: 0 }} className="profile-grid">
           {/* Sidebar */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -372,7 +372,7 @@ export function ProfilePage() {
           >
             {/* Avatar */}
             <div style={{
-              padding: '20px',
+              padding: '14px',
               background: 'rgba(255,255,255,0.02)',
               border: '1px solid rgba(255,255,255,0.05)',
               borderRadius: 8,
@@ -419,7 +419,7 @@ export function ProfilePage() {
                   onClick={() => setActive(item.id)}
                   style={{
                     width: '100%',
-                    padding: '13px 16px',
+                    padding: '11px 14px',
                     background: active === item.id ? 'rgba(214,178,94,0.06)' : 'transparent',
                     border: 'none',
                     borderLeft: active === item.id ? '2px solid #D6B25E' : '2px solid transparent',
@@ -447,6 +447,7 @@ export function ProfilePage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.15 }}
             className="profile-content"
+            style={{ minHeight: 0, overflow: 'hidden' }}
           >
             {!customerSignedIn && <ProfileTelegramLogin onReady={loadDashboard} />}
             <AnimatePresence mode="wait">
@@ -460,16 +461,16 @@ export function ProfilePage() {
                   transition={{ duration: 0.25 }}
                 >
                   <div className="profile-account-panel" style={{
-                    padding: '24px',
+                    padding: '16px',
                     background: 'rgba(255,255,255,0.02)',
                     border: '1px solid rgba(255,255,255,0.05)',
                     borderRadius: 8,
-                    marginBottom: 16,
+                    marginBottom: 10,
                   }}>
-                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 20 }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.66rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 12 }}>
                       Informazioni Account
                     </div>
-                    <div className="profile-account-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div className="profile-account-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                       {[
                         { label: 'Username', value: user?.username ? `@${user.username}` : user?.firstName || 'Utente' },
                         { label: 'Stato', value: customerSignedIn ? (isAdmin ? 'Admin' : 'Membro Attivo') : 'Non autenticato' },
@@ -477,15 +478,15 @@ export function ProfilePage() {
                         { label: 'Ordini Totali', value: customerSignedIn ? String(orders.length) : '-' },
                       ].map(field => (
                         <div key={field.label} style={{
-                          padding: '12px 14px',
+                          padding: '10px 12px',
                           background: 'rgba(255,255,255,0.02)',
                           border: '1px solid rgba(255,255,255,0.05)',
                           borderRadius: 6,
                         }}>
-                          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.65rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.25)', marginBottom: 6 }}>
+                          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.25)', marginBottom: 4 }}>
                             {field.label}
                           </div>
-                          <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.9rem', color: '#F5F5F5' }}>
+                          <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '0.84rem', color: '#F5F5F5' }}>
                             {field.value}
                           </div>
                         </div>
@@ -503,17 +504,17 @@ export function ProfilePage() {
                       <div
                         key={stat.label}
                         style={{
-                          padding: '16px',
+                          padding: '12px',
                           background: 'rgba(214,178,94,0.04)',
                           border: '1px solid rgba(214,178,94,0.1)',
                           borderRadius: 8,
                           textAlign: 'center' as const,
                         }}
                       >
-                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '1.2rem', fontWeight: 700, color: '#D6B25E', marginBottom: 4 }}>
+                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '1rem', fontWeight: 700, color: '#D6B25E', marginBottom: 3 }}>
                           {stat.value}
                         </div>
-                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.65rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)' }}>
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.6rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)' }}>
                           {stat.label}
                         </div>
                       </div>
@@ -525,22 +526,25 @@ export function ProfilePage() {
               {/* ORDERS */}
               {active === 'orders' && (
                 <motion.div
+                  className="profile-orders-section"
                   key="orders"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.25 }}
                 >
-                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 20 }}>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 12, flexShrink: 0 }}>
                     Storico Ordini
                   </div>
-                  {!customerSignedIn ? (
-                    <div style={{ color: 'rgba(245,245,245,0.4)', fontSize: '0.84rem' }}>Accedi con Telegram per vedere gli ordini.</div>
-                  ) : orders.length === 0 ? (
-                    <div style={{ color: 'rgba(245,245,245,0.4)', fontSize: '0.84rem' }}>Nessun ordine trovato.</div>
-                  ) : orders.map(order => (
-                    <OrderCard key={order.id} order={order} onOpenPayment={setPaymentOrder} />
-                  ))}
+                  <div className="profile-orders-list">
+                    {!customerSignedIn ? (
+                      <div style={{ color: 'rgba(245,245,245,0.4)', fontSize: '0.84rem' }}>Accedi con Telegram per vedere gli ordini.</div>
+                    ) : orders.length === 0 ? (
+                      <div style={{ color: 'rgba(245,245,245,0.4)', fontSize: '0.84rem' }}>Nessun ordine trovato.</div>
+                    ) : orders.map(order => (
+                      <OrderCard key={order.id} order={order} onOpenPayment={setPaymentOrder} />
+                    ))}
+                  </div>
                 </motion.div>
               )}
 
@@ -554,12 +558,12 @@ export function ProfilePage() {
                   transition={{ duration: 0.25 }}
                 >
                   <div className="profile-settings-panel" style={{
-                    padding: '24px',
+                    padding: '16px',
                     background: 'rgba(255,255,255,0.02)',
                     border: '1px solid rgba(255,255,255,0.05)',
                     borderRadius: 8,
                   }}>
-                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 20 }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(245,245,245,0.3)', marginBottom: 12 }}>
                       Preferenze
                     </div>
                     {[
@@ -589,7 +593,7 @@ export function ProfilePage() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          padding: '14px 0',
+                          padding: '10px 0',
                           borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none',
                         }}
                       >
@@ -636,7 +640,7 @@ export function ProfilePage() {
                         {newsletterMessage}
                       </div>
                     )}
-                    <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                       <Link to="/privacy" style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.78rem', color: '#D6B25E', textDecoration: 'none' }}>
                         Privacy Policy
                       </Link>
@@ -712,30 +716,59 @@ export function ProfilePage() {
 
       {/* Mobile: Tabs below header */}
       <style>{`
+        .profile-content > div,
+        .profile-content > div > div {
+          min-height: 0;
+        }
+        .profile-orders-section {
+          height: 100%;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+        .profile-orders-list {
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow-y: auto;
+          overscroll-behavior: contain;
+          padding-right: 8px;
+        }
+        .profile-order-card {
+          margin-bottom: 8px !important;
+        }
         @media (max-width: 768px) {
           .cc-profile-page {
             overflow-x: hidden;
+            padding-top: 58px !important;
           }
           .profile-container {
             box-sizing: border-box;
             max-width: 100% !important;
-            padding: 20px 12px calc(82px + env(safe-area-inset-bottom, 0px)) !important;
+            height: 100% !important;
+            padding: 8px 10px calc(68px + env(safe-area-inset-bottom, 0px)) !important;
           }
           .profile-header {
             align-items: flex-start !important;
             gap: 10px !important;
-            margin-bottom: 18px !important;
+            margin-bottom: 8px !important;
+          }
+          .profile-header > div:first-child > div:first-child {
+            margin-bottom: 4px !important;
+            font-size: 0.58rem !important;
           }
           .profile-title {
-            font-size: clamp(1.55rem, 9vw, 2rem) !important;
+            font-size: clamp(1.22rem, 7vw, 1.55rem) !important;
           }
           .profile-logout {
             flex-shrink: 0;
-            padding: 9px 10px !important;
+            padding: 7px 9px !important;
+            font-size: 0.7rem !important;
           }
           .profile-grid {
             grid-template-columns: 1fr !important;
-            gap: 14px !important;
+            grid-template-rows: auto minmax(0, 1fr);
+            gap: 8px !important;
             min-width: 0;
           }
           .profile-sidebar {
@@ -755,39 +788,47 @@ export function ProfilePage() {
             justify-content: center !important;
             border-left: none !important;
             border-bottom: 2px solid transparent !important;
-            padding: 11px 8px !important;
+            padding: 8px 6px !important;
+          }
+          .profile-tabs button span {
+            font-size: 0.72rem !important;
           }
           .profile-content {
             min-width: 0;
+            min-height: 0;
           }
           .profile-account-panel {
-            padding: 14px !important;
-            margin-bottom: 10px !important;
+            padding: 10px !important;
+            margin-bottom: 8px !important;
           }
           .profile-account-grid {
-            grid-template-columns: 1fr !important;
-            gap: 8px !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 6px !important;
           }
           .profile-account-grid > div {
-            padding: 10px 12px !important;
+            padding: 8px !important;
           }
           .profile-account-grid > div > div:last-child {
             overflow-wrap: anywhere;
+            font-size: 0.76rem !important;
           }
           .profile-stats {
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-            gap: 8px !important;
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: 6px !important;
           }
           .profile-stats > div {
-            padding: 12px 8px !important;
+            padding: 8px 5px !important;
           }
-          .profile-stats > div:last-child {
-            grid-column: 1 / -1;
+          .profile-stats > div > div:first-child {
+            font-size: 0.86rem !important;
+          }
+          .profile-stats > div > div:last-child {
+            font-size: 0.52rem !important;
           }
           .profile-order-header {
             align-items: flex-start !important;
             flex-direction: column;
-            padding: 12px !important;
+            padding: 10px !important;
           }
           .profile-order-summary {
             box-sizing: border-box;
@@ -796,7 +837,7 @@ export function ProfilePage() {
             gap: 8px !important;
           }
           .profile-order-details {
-            padding: 0 12px 12px !important;
+            padding: 0 10px 10px !important;
           }
           .profile-order-details a {
             box-sizing: border-box;
@@ -807,18 +848,29 @@ export function ProfilePage() {
             gap: 4px !important;
           }
           .profile-settings-panel {
-            padding: 14px !important;
+            padding: 10px !important;
           }
           .profile-setting-row {
-            gap: 12px;
+            gap: 10px;
+            padding: 8px 0 !important;
           }
           .profile-setting-row > div:first-child {
             min-width: 0;
           }
+          .profile-setting-row > div:first-child > div:first-child {
+            font-size: 0.8rem !important;
+          }
+          .profile-setting-row > div:first-child > div:last-child {
+            font-size: 0.66rem !important;
+            line-height: 1.35 !important;
+          }
         }
         @media (max-width: 340px) {
-          .profile-stats {
+          .profile-account-grid {
             grid-template-columns: 1fr !important;
+          }
+          .profile-tabs button span {
+            display: none;
           }
         }
         .transit-badge {
