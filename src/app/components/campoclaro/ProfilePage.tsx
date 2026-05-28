@@ -832,36 +832,34 @@ export function ProfilePage() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }} className="profile-account-grid">
-                    <div style={{ padding: 14, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'Satoshi', sans-serif", fontWeight: 800, color: '#F5F5F5', marginBottom: 8 }}>
-                        <Sparkles size={15} color="#D6B25E" /> Privilegi attivi
-                      </div>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {(circle.current?.perks || []).length ? circle.current?.perks.map(perk => (
-                          <span key={perk} style={{ padding: '5px 8px', borderRadius: 999, background: 'rgba(214,178,94,0.08)', border: '1px solid rgba(214,178,94,0.14)', color: '#D6B25E', fontSize: '0.68rem' }}>
-                            {perk}
-                          </span>
-                        )) : (
-                          <span style={{ color: 'rgba(245,245,245,0.36)', fontSize: '0.78rem' }}>Nessun privilegio attivo.</span>
-                        )}
-                      </div>
+                  <div style={{ padding: 14, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'Satoshi', sans-serif", fontWeight: 800, color: '#F5F5F5', marginBottom: 8 }}>
+                      <Sparkles size={15} color="#D6B25E" /> Privilegi attivi
                     </div>
-                    <div style={{ padding: 14, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 800, color: '#F5F5F5', marginBottom: 8 }}>
-                        Как повысить уровень
-                      </div>
-                      {[
-                        'Приглашай друзей',
-                        'Делай заказы',
-                        'Оплачивай заказы с помощью крипты',
-                        'Крупный заказ: от 1 до 8 кг +10 баллов/кг, свыше 8 кг +8 баллов/кг',
-                      ].map(item => (
-                        <div key={item} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', color: 'rgba(245,245,245,0.48)', fontSize: '0.76rem' }}>
-                          {item}
-                        </div>
-                      ))}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {(circle.current?.perks || []).length ? circle.current?.perks.map(perk => (
+                        <span key={perk} style={{ padding: '5px 8px', borderRadius: 999, background: 'rgba(214,178,94,0.08)', border: '1px solid rgba(214,178,94,0.14)', color: '#D6B25E', fontSize: '0.68rem' }}>
+                          {perk}
+                        </span>
+                      )) : (
+                        <span style={{ color: 'rgba(245,245,245,0.36)', fontSize: '0.78rem' }}>Nessun privilegio attivo.</span>
+                      )}
                     </div>
+                  </div>
+                  <div style={{ marginTop: 12, padding: 14, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 800, color: '#F5F5F5', marginBottom: 8 }}>
+                      Come salire di livello
+                    </div>
+                    {[
+                      'Invita amici',
+                      'Fai ordini regolari',
+                      'Paga gli ordini con crypto',
+                      'Ordini grandi: da 1 a 8 kg +10 punti/kg, oltre 8 kg +8 punti/kg',
+                    ].map(item => (
+                      <div key={item} style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', color: 'rgba(245,245,245,0.58)', fontSize: '0.78rem', lineHeight: 1.45 }}>
+                        {item}
+                      </div>
+                    ))}
                   </div>
                   <div style={{ marginTop: 12, padding: 14, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
