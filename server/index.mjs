@@ -213,6 +213,14 @@ function itemWeightGrams(item = {}) {
   return (match[2] || 'g') === 'kg' ? value * 1000 : value
 }
 
+function circleBonusForLargeOrderWeight(weightGrams = 0) {
+  const kg = Math.max(0, Number(weightGrams || 0)) / 1000
+  if (kg < 1) return 0
+  const firstTierKg = Math.min(kg, 8)
+  const secondTierKg = Math.max(0, kg - 8)
+  return Math.floor(firstTierKg * 10 + secondTierKg * 8)
+}
+
 function cryptoPaymentUri(currency, address, amount) {
   if (currency === 'BTC') return `bitcoin:${address}?amount=${amount}`
   if (currency === 'ETH') return `ethereum:${address}`
@@ -1316,8 +1324,8 @@ app.post('/api/orders', async (req, res) => {
       quantity: Number(item.quantity),
     }
   })
-  const circleScoreAward = 0
   const orderWeightGrams = orderItems.reduce((sum, item) => sum + itemWeightGrams(item) * Number(item.quantity || 1), 0)
+  const circleScoreAward = circleBonusForLargeOrderWeight(orderWeightGrams)
   const firstCustomerOrder = !existingOrders.some(order => String(order.customer?.id || '') === String(customer.id))
   const referralDiscountEligible = storedCustomer?.referralDiscountAvailable === true
     && !storedCustomer.referralDiscountUsedAt

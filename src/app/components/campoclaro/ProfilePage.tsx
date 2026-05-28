@@ -855,6 +855,7 @@ export function ProfilePage() {
                         'Приглашай друзей',
                         'Делай заказы',
                         'Оплачивай заказы с помощью крипты',
+                        'Крупный заказ: от 1 до 8 кг +10 баллов/кг, свыше 8 кг +8 баллов/кг',
                       ].map(item => (
                         <div key={item} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', color: 'rgba(245,245,245,0.48)', fontSize: '0.76rem' }}>
                           {item}

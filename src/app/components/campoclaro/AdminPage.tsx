@@ -610,7 +610,9 @@ export function AdminPage() {
   }
 
   const updateCirclePerks = (index: number, perks: string[]) => {
-    updateCircleLevel(index, { perks: perks.map(item => item.trim()).filter(Boolean).slice(0, 6) })
+    // Keep empty draft items so "+ Privilegio" can render a new input row.
+    // Final cleanup happens in server normalization when content is saved.
+    updateCircleLevel(index, { perks: perks.slice(0, 6) })
   }
 
   const startNewProduct = () => {
