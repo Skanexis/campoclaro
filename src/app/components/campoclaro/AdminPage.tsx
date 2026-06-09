@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode, Ref } from 'react'
 import { motion } from 'motion/react'
-import { BarChart3, Check, Crown, ExternalLink, Film, ImageIcon, LogOut, Mail, Package, Save, Send, ShoppingBag, Trash2, Upload, UserCheck, X } from 'lucide-react'
+import { BarChart3, Check, Crown, ExternalLink, Film, ImageIcon, LogOut, Mail, Package, Save, Send, ShieldCheck, ShoppingBag, Trash2, Upload, UserCheck, X } from 'lucide-react'
 import { Product } from './data'
-import { api, Order, SiteContent, type AdminCustomer } from '../../lib/api'
+import { api, Order, SiteContent, type AdminCustomer, type TelegramAdmin } from '../../lib/api'
 import { FALLBACK_SITE_CONTENT } from '../../hooks/useSiteContent'
 import { TelegramStartLogin } from './TelegramStartLogin'
 
-type AdminTab = 'orders' | 'products' | 'users' | 'circle' | 'filters' | 'contacts' | 'newsletter'
+type AdminTab = 'orders' | 'products' | 'users' | 'admins' | 'circle' | 'filters' | 'contacts' | 'newsletter'
 type ProductMediaKey = 'images' | 'videos'
 const MEDIA_MAX_BYTES: Record<ProductMediaKey, number> = {
   images: 15 * 1024 * 1024,
@@ -447,6 +447,7 @@ export function AdminPage() {
   const [stats, setStats] = useState({ products: 0, orders: 0, revenue: 0, pending: 0, newsletterSubscribers: 0, customers: 0 })
   const [orders, setOrders] = useState<Order[]>([])
   const [customers, setCustomers] = useState<AdminCustomer[]>([])
+  const [telegramAdmins, setTelegramAdmins] = useState<TelegramAdmin[]>([])
   const [xpDrafts, setXpDrafts] = useState<Record<string, string>>({})
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, string>>({})
   const [products, setProducts] = useState<(Product & { active?: boolean })[]>([])
@@ -457,6 +458,7 @@ export function AdminPage() {
   const [newsletterTitle, setNewsletterTitle] = useState('')
   const [newsletterBody, setNewsletterBody] = useState('')
   const [newsletterSending, setNewsletterSending] = useState(false)
+  const [newTelegramAdminId, setNewTelegramAdminId] = useState('')
   const [mediaUploading, setMediaUploading] = useState<ProductMediaKey | ''>('')
   const [removedMedia, setRemovedMedia] = useState<string[]>([])
   const [orderFilter, setOrderFilter] = useState<'all' | 'new' | 'paid' | 'shipped' | 'completed' | 'meetup'>('all')
@@ -465,10 +467,11 @@ export function AdminPage() {
   const productNameRef = useRef<HTMLInputElement>(null)
 
   const loadAdmin = async () => {
-    const [statsData, orderData, customerData, productData, contentData] = await Promise.all([api.adminStats(), api.adminOrders(), api.adminCustomers(), api.adminProducts(), api.adminSiteContent()])
+    const [statsData, orderData, customerData, adminData, productData, contentData] = await Promise.all([api.adminStats(), api.adminOrders(), api.adminCustomers(), api.adminTelegramAdmins(), api.adminProducts(), api.adminSiteContent()])
     setStats(statsData)
     setOrders(orderData)
     setCustomers(customerData)
+    setTelegramAdmins(adminData)
     setXpDrafts(prev => Object.fromEntries(customerData.map(customer => [customer.id, prev[customer.id] ?? ''])))
     setTrackingDrafts(Object.fromEntries(orderData.map(order => [order.id, order.trackingNumber || ''])))
     setProducts(productData)
@@ -717,6 +720,35 @@ export function AdminPage() {
     }
   }
 
+  const addTelegramAdmin = async () => {
+    const id = newTelegramAdminId.replace(/\D/g, '')
+    if (!id) {
+      setMessage('Inserisci Telegram ID numerico.')
+      return
+    }
+    setMessage('')
+    try {
+      await api.addTelegramAdmin(id)
+      setNewTelegramAdminId('')
+      setMessage(`Admin Telegram ${id} aggiunto.`)
+      await loadAdmin()
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Admin non aggiunto')
+    }
+  }
+
+  const deleteTelegramAdmin = async (id: string) => {
+    if (!window.confirm(`Rimuovere admin Telegram ${id}?`)) return
+    setMessage('')
+    try {
+      await api.deleteTelegramAdmin(id)
+      setMessage(`Admin Telegram ${id} rimosso.`)
+      await loadAdmin()
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Admin non rimosso')
+    }
+  }
+
   const adjustCustomerXp = async (id: string) => {
     const delta = Math.trunc(Number(xpDrafts[id] || 0))
     if (!Number.isFinite(delta) || delta === 0) {
@@ -785,6 +817,7 @@ export function AdminPage() {
             { id: 'orders', label: 'Ordini' },
             { id: 'products', label: 'Catalogo' },
             { id: 'users', label: 'Utenti' },
+            { id: 'admins', label: 'Admins' },
             { id: 'circle', label: 'Circle' },
             { id: 'filters', label: 'Filtri' },
             { id: 'contacts', label: 'Contatti' },
@@ -1337,6 +1370,96 @@ export function AdminPage() {
                 })}
               </div>
             )}
+          </motion.div>
+        )}
+
+        {tab === 'admins' && (
+          <motion.div className="admin-form-panel" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ ...panel, padding: 18 }}>
+            <AdminPanelHeader
+              eyebrow="Telegram"
+              title="Admin IDs"
+              meta={[
+                { label: 'totali', value: telegramAdmins.length },
+                { label: 'da pannello', value: telegramAdmins.filter(admin => admin.source === 'runtime').length },
+                { label: 'da .env', value: telegramAdmins.filter(admin => admin.source === 'env').length },
+              ]}
+            />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 18 }} className="admin-products">
+              <div style={{ display: 'grid', gap: 10 }}>
+                {telegramAdmins.length === 0 ? (
+                  <div className="admin-empty-state" style={{ padding: 24, color: 'rgba(245,245,245,0.38)', fontFamily: "'Inter', sans-serif" }}>
+                    Nessun admin configurato.
+                  </div>
+                ) : telegramAdmins.map(admin => {
+                  const name = [admin.firstName, admin.lastName].filter(Boolean).join(' ').trim()
+                  return (
+                    <article key={admin.id} className="admin-user-card" style={{ ...panel, padding: 14 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'center' }} className="admin-inline-row">
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 5 }}>
+                            <span style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 800, color: '#F5F5F5' }}>
+                              {name || admin.username || `Telegram ${admin.id}`}
+                            </span>
+                            <span className="admin-mini-pill">{admin.source === 'env' ? '.env' : 'pannello'}</span>
+                          </div>
+                          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: '0.72rem', color: 'rgba(245,245,245,0.42)', overflowWrap: 'anywhere' }}>
+                            {admin.username ? `@${admin.username} · ` : ''}ID {admin.id}
+                          </div>
+                          <div className="admin-order-muted">
+                            Accesso pannello, bot e notifiche ordini attivi.
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={admin.source === 'env'}
+                          onClick={() => deleteTelegramAdmin(admin.id)}
+                          title={admin.source === 'env' ? 'Rimuovi questo ID da ADMIN_TELEGRAM_IDS nel .env' : 'Rimuovi admin'}
+                          style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 6,
+                            border: admin.source === 'env' ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(229,115,115,0.24)',
+                            background: admin.source === 'env' ? 'rgba(255,255,255,0.03)' : 'rgba(229,115,115,0.08)',
+                            color: admin.source === 'env' ? 'rgba(245,245,245,0.25)' : '#E57373',
+                            cursor: admin.source === 'env' ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+
+              <div style={{ ...panel, padding: 16, alignSelf: 'start' }}>
+                <div style={{ color: '#D6B25E', marginBottom: 12 }}>
+                  <ShieldCheck size={20} />
+                </div>
+                <div style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: '1rem', color: '#F5F5F5', marginBottom: 12 }}>
+                  Aggiungi admin
+                </div>
+                <Field
+                  label="Telegram ID"
+                  value={newTelegramAdminId}
+                  onChange={setNewTelegramAdminId}
+                />
+                <button
+                  type="button"
+                  onClick={addTelegramAdmin}
+                  style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'center', padding: '12px 18px', background: '#D6B25E', color: '#050505', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  <UserCheck size={16} /> Aggiungi
+                </button>
+                <div style={{ marginTop: 12, fontFamily: "'Inter', sans-serif", fontSize: '0.76rem', lineHeight: 1.55, color: 'rgba(245,245,245,0.42)' }}>
+                  Inserisci l'ID numerico Telegram. Dopo l'aggiunta l'utente puo fare login tramite bot e ricevera le stesse notifiche degli admin in .env.
+                </div>
+                {message && <div style={{ marginTop: 14, color: message.includes('aggiunto') || message.includes('rimosso') ? '#D6B25E' : '#E57373', fontFamily: "'Inter', sans-serif", fontSize: '0.8rem' }}>{message}</div>}
+              </div>
+            </div>
           </motion.div>
         )}
 

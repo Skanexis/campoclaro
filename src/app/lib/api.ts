@@ -84,6 +84,15 @@ export interface AdminCustomer {
   firstSeenAt: string
 }
 
+export interface TelegramAdmin {
+  id: string
+  firstName: string
+  lastName: string
+  username: string
+  source: 'env' | 'runtime'
+  addedAt: string
+}
+
 export interface SiteContent {
   welcomeTitle: string
   welcomeSubtitle: string
@@ -204,6 +213,11 @@ export const api = {
     request<{ ok: boolean; referralXp: number; discountAvailable: boolean }>('/api/customer/referral/apply', { method: 'POST', body: JSON.stringify({ code }) }),
   adminStats: () => request<{ products: number; orders: number; revenue: number; pending: number; newsletterSubscribers?: number; customers?: number }>('/api/admin/stats'),
   adminCustomers: () => request<AdminCustomer[]>('/api/admin/customers'),
+  adminTelegramAdmins: () => request<TelegramAdmin[]>('/api/admin/telegram-admins'),
+  addTelegramAdmin: (id: string) =>
+    request<TelegramAdmin>('/api/admin/telegram-admins', { method: 'POST', body: JSON.stringify({ id }) }),
+  deleteTelegramAdmin: (id: string) =>
+    request<{ ok: boolean }>(`/api/admin/telegram-admins/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   adjustCustomerXp: (id: string, delta: number) =>
     request<AdminCustomer>(`/api/admin/customers/${encodeURIComponent(id)}/xp`, { method: 'PATCH', body: JSON.stringify({ delta }) }),
   adminProducts: () => request<Product[]>('/api/admin/products'),

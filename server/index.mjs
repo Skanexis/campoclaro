@@ -21,6 +21,7 @@ const ordersFile = path.join(dataDir, 'orders.json')
 const siteContentFile = path.join(dataDir, 'site-content.json')
 const newsletterSubscribersFile = path.join(dataDir, 'newsletter-subscribers.json')
 const customersFile = path.join(dataDir, 'customers.json')
+const adminsFile = path.join(dataDir, 'admins.json')
 const mediaDir = path.join(dataDir, 'media')
 const maxImageUploadBytes = 15 * 1024 * 1024
 const maxVideoUploadBytes = 250 * 1024 * 1024
@@ -68,7 +69,7 @@ const defaultSiteContent = {
 const app = express()
 const port = Number(process.env.API_PORT || 3001)
 const sessionSecret = process.env.SESSION_SECRET || 'campoclaro-dev-secret'
-const adminIds = new Set((process.env.ADMIN_TELEGRAM_IDS || '').split(',').map(v => v.trim()).filter(Boolean))
+const envAdminIds = (process.env.ADMIN_TELEGRAM_IDS || '').split(',').map(v => v.trim()).filter(Boolean)
 const ccppFee = 50
 const courierDeliveryFee = 20
 const meetupDepositRate = 0.25
@@ -510,6 +511,7 @@ function formatNewsletterMessage(title, body) {
 }
 
 async function notifyAdmins(order, reason = 'Nuovo ordine') {
+  const adminIds = await getAdminIdSet()
   if (!adminIds.size) return
 
   const isMeetup = order.delivery === 'meetup'
@@ -602,6 +604,45 @@ async function readJson(file, fallback) {
 async function writeJson(file, data) {
   await fs.mkdir(path.dirname(file), { recursive: true })
   await fs.writeFile(file, `${JSON.stringify(data, null, 2)}\n`)
+}
+
+function normalizeAdminRecord(input = {}) {
+  const id = String(input.id || '').trim()
+  if (!id) return null
+  return {
+    id,
+    firstName: String(input.firstName || ''),
+    lastName: String(input.lastName || ''),
+    username: String(input.username || '').replace(/^@/, ''),
+    source: input.source === 'env' ? 'env' : 'runtime',
+    addedAt: input.addedAt || new Date().toISOString(),
+  }
+}
+
+async function getAdminRecords() {
+  const runtimeAdmins = await readJson(adminsFile, [])
+  const records = new Map()
+  for (const id of envAdminIds) {
+    records.set(String(id), {
+      id: String(id),
+      firstName: '',
+      lastName: '',
+      username: '',
+      source: 'env',
+      addedAt: '',
+    })
+  }
+  for (const admin of Array.isArray(runtimeAdmins) ? runtimeAdmins : []) {
+    const record = normalizeAdminRecord(admin)
+    if (!record) continue
+    const existing = records.get(record.id)
+    records.set(record.id, existing ? { ...record, source: existing.source } : record)
+  }
+  return [...records.values()]
+}
+
+async function getAdminIdSet() {
+  return new Set((await getAdminRecords()).map(admin => String(admin.id)))
 }
 
 async function initializeDataDir() {
@@ -721,13 +762,14 @@ function telegramUserFromMessage(from, role) {
   }
 }
 
-function beginTelegramLogin(scope, res) {
+async function beginTelegramLogin(scope, res) {
   if (!telegramApiBase || !telegramBotUsername) {
     return res.status(503).json({ error: 'Configura TELEGRAM_BOT_TOKEN e TELEGRAM_BOT_USERNAME' })
   }
   if (!process.env.TELEGRAM_WEBHOOK_SECRET) {
     return res.status(503).json({ error: 'Configura TELEGRAM_WEBHOOK_SECRET per autorizzare tramite /start' })
   }
+  const adminIds = await getAdminIdSet()
   if (scope === 'admin' && adminIds.size === 0) {
     return res.status(503).json({ error: 'Configura ADMIN_TELEGRAM_IDS' })
   }
@@ -766,9 +808,10 @@ function completeTelegramLogin(scope, req, res) {
   return res.json({ status: 'complete', user: login.user })
 }
 
-function requireAdmin(req, res, next) {
+async function requireAdmin(req, res, next) {
   const session = readSession(req)
   if (!session?.id) return res.status(401).json({ error: 'Unauthorized' })
+  const adminIds = await getAdminIdSet()
   if (adminIds.size > 0 && !adminIds.has(String(session.id))) {
     return res.status(403).json({ error: 'Forbidden' })
   }
@@ -1150,6 +1193,7 @@ async function updateCryptoPayment(order, payment) {
   if (!fullyPaid) {
     order.paymentStatus = 'partially_paid'
     await notifyCustomerOrderUpdate(order, 'payment_partial')
+    const adminIds = await getAdminIdSet()
     for (const adminId of adminIds) {
       const amounts = cryptoPaymentAmounts(order)
       await sendTelegramMessage(adminId, [
@@ -1174,6 +1218,7 @@ async function updateCryptoPayment(order, payment) {
     return true
   }
 
+  const adminIds = await getAdminIdSet()
   for (const adminId of adminIds) {
     const amounts = cryptoPaymentAmounts(order)
     await sendTelegramMessage(adminId, [
@@ -1507,16 +1552,16 @@ app.post('/api/orders/:id/crypto-paid', async (req, res) => {
   res.json(order)
 })
 
-app.post('/api/auth/telegram/start', (_req, res) => {
-  beginTelegramLogin('admin', res)
+app.post('/api/auth/telegram/start', async (_req, res) => {
+  await beginTelegramLogin('admin', res)
 })
 
 app.get('/api/auth/telegram/status/:requestId', (req, res) => {
   completeTelegramLogin('admin', req, res)
 })
 
-app.post('/api/customer/telegram/start', (_req, res) => {
-  beginTelegramLogin('customer', res)
+app.post('/api/customer/telegram/start', async (_req, res) => {
+  await beginTelegramLogin('customer', res)
 })
 
 app.get('/api/customer/telegram/status/:requestId', (req, res) => {
@@ -1751,6 +1796,48 @@ app.get('/api/admin/customers', requireAdmin, async (_req, res) => {
   }
 
   res.json([...customers.values()].sort((a, b) => String(b.lastOrderAt || b.firstSeenAt).localeCompare(String(a.lastOrderAt || a.firstSeenAt))))
+})
+
+app.get('/api/admin/telegram-admins', requireAdmin, async (_req, res) => {
+  const [admins, customers] = await Promise.all([getAdminRecords(), readJson(customersFile, [])])
+  res.json(admins.map(admin => {
+    const customer = customers.find(item => String(item.id || '') === String(admin.id))
+    return {
+      ...admin,
+      firstName: admin.firstName || String(customer?.firstName || ''),
+      lastName: admin.lastName || String(customer?.lastName || ''),
+      username: admin.username || String(customer?.username || ''),
+    }
+  }).sort((a, b) => String(a.source).localeCompare(String(b.source)) || String(a.id).localeCompare(String(b.id))))
+})
+
+app.post('/api/admin/telegram-admins', requireAdmin, async (req, res) => {
+  const id = String(req.body.id || '').trim()
+  if (!/^\d{4,20}$/.test(id)) return res.status(400).json({ error: 'Telegram ID non valido' })
+
+  const adminIds = await getAdminIdSet()
+  if (adminIds.has(id)) return res.status(409).json({ error: 'Admin gia presente' })
+
+  const admins = await readJson(adminsFile, [])
+  const record = normalizeAdminRecord({
+    id,
+    firstName: req.body.firstName,
+    lastName: req.body.lastName,
+    username: req.body.username,
+  })
+  admins.push(record)
+  await writeJson(adminsFile, admins)
+  await sendTelegramMessage(id, '<b>Accesso admin CAMPOCLARO attivato</b>\nOra puoi accedere alla pannello e ricevere notifiche ordini da questo bot.')
+  res.status(201).json(record)
+})
+
+app.delete('/api/admin/telegram-admins/:id', requireAdmin, async (req, res) => {
+  const id = String(req.params.id || '').trim()
+  if (envAdminIds.includes(id)) return res.status(400).json({ error: 'Questo admin arriva da .env. Rimuovilo da ADMIN_TELEGRAM_IDS.' })
+  const admins = await readJson(adminsFile, [])
+  const nextAdmins = admins.filter(admin => String(admin.id || '') !== id)
+  await writeJson(adminsFile, nextAdmins)
+  res.json({ ok: true })
 })
 
 app.patch('/api/admin/customers/:id/xp', requireAdmin, async (req, res) => {
@@ -1999,6 +2086,7 @@ app.post('/api/telegram/webhook', async (req, res) => {
   if (process.env.TELEGRAM_WEBHOOK_SECRET && req.get('x-telegram-bot-api-secret-token') !== process.env.TELEGRAM_WEBHOOK_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
+  const adminIds = await getAdminIdSet()
 
   const message = req.body?.message
   const fromId = String(message?.from?.id || '')

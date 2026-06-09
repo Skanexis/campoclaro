@@ -6,6 +6,7 @@ type ProductMediaPreviewProps = {
   alt: string
   fit?: 'cover' | 'contain'
   controls?: boolean
+  previewSeconds?: number
 }
 
 function useInView() {
@@ -35,9 +36,21 @@ function useInView() {
   return { ref, visible }
 }
 
-export function ProductMediaPreview({ image, video, alt, fit = 'cover', controls = false }: ProductMediaPreviewProps) {
+export function ProductMediaPreview({ image, video, alt, fit = 'cover', controls = false, previewSeconds = 4 }: ProductMediaPreviewProps) {
   const { ref, visible } = useInView()
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const isVideoPreview = Boolean(video && !image && !controls)
   const commonStyle = { width: '100%', height: '100%', objectFit: fit, background: '#050505', display: 'block' } as const
+
+  useEffect(() => {
+    if (!visible || !isVideoPreview) return
+    const element = videoRef.current
+    if (!element) return
+
+    element.currentTime = 0
+    const playPromise = element.play()
+    if (playPromise) playPromise.catch(() => undefined)
+  }, [isVideoPreview, video, visible])
 
   return (
     <div ref={ref} style={{ width: '100%', height: '100%', background: '#050505' }}>
@@ -53,11 +66,28 @@ export function ProductMediaPreview({ image, video, alt, fit = 'cover', controls
       )}
       {!image && video && visible && (
         <video
+          ref={videoRef}
           src={video}
-          muted={!controls}
+          aria-label={alt}
+          muted
+          autoPlay={isVideoPreview}
           controls={controls}
           playsInline
-          preload={controls ? 'metadata' : 'none'}
+          preload={controls ? 'metadata' : 'auto'}
+          onLoadedMetadata={() => {
+            if (!isVideoPreview) return
+            const element = videoRef.current
+            if (!element) return
+            element.currentTime = 0
+            const playPromise = element.play()
+            if (playPromise) playPromise.catch(() => undefined)
+          }}
+          onTimeUpdate={event => {
+            if (!isVideoPreview || event.currentTarget.currentTime < previewSeconds) return
+            event.currentTarget.currentTime = 0
+            const playPromise = event.currentTarget.play()
+            if (playPromise) playPromise.catch(() => undefined)
+          }}
           style={commonStyle}
         />
       )}
