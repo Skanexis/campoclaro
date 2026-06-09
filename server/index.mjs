@@ -660,12 +660,23 @@ async function initializeDataDir() {
       .filter(fileName => fileName.startsWith('.upload-') && fileName.endsWith('.part'))
       .map(fileName => fs.rm(path.join(mediaDir, fileName), { force: true })),
   )
-  for (const fileName of ['products.json', 'orders.json', 'site-content.json']) {
+  for (const fileName of ['products.json', 'orders.json', 'site-content.json', 'admins.json']) {
     const target = path.join(dataDir, fileName)
     try {
       await fs.copyFile(path.join(seedDataDir, fileName), target, fsConstants.COPYFILE_EXCL)
     } catch (error) {
       if (error.code !== 'EEXIST') throw error
+    }
+  }
+  const seedAdmins = await readJson(path.join(seedDataDir, 'admins.json'), [])
+  if (Array.isArray(seedAdmins) && seedAdmins.length > 0) {
+    const runtimeAdmins = await readJson(adminsFile, [])
+    const adminIds = new Set((Array.isArray(runtimeAdmins) ? runtimeAdmins : []).map(admin => String(admin.id || '').trim()).filter(Boolean))
+    const missingAdmins = seedAdmins
+      .map(admin => normalizeAdminRecord(admin))
+      .filter(admin => admin && !adminIds.has(admin.id))
+    if (missingAdmins.length > 0) {
+      await writeJson(adminsFile, [...(Array.isArray(runtimeAdmins) ? runtimeAdmins : []), ...missingAdmins])
     }
   }
   const products = await readJson(productsFile, [])
