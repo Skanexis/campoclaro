@@ -594,9 +594,15 @@ app.use(cookieParser())
 
 async function readJson(file, fallback) {
   try {
-    return JSON.parse(await fs.readFile(file, 'utf8'))
+    const content = await fs.readFile(file, 'utf8')
+    if (!content.trim()) return fallback
+    return JSON.parse(content)
   } catch (error) {
     if (error.code === 'ENOENT') return fallback
+    if (error instanceof SyntaxError) {
+      console.error(`Invalid JSON in ${file}: ${error.message}`)
+      return fallback
+    }
     throw error
   }
 }
