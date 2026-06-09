@@ -80,6 +80,7 @@ const btcMinConfirmations = Number(process.env.BTC_MIN_CONFIRMATIONS || 1)
 const ethMinConfirmations = Number(process.env.ETH_MIN_CONFIRMATIONS || 12)
 const tronMinConfirmations = Number(process.env.TRON_MIN_CONFIRMATIONS || 1)
 const invalidJsonWarnings = new Set()
+const jsonRepairPromises = new Map()
 const autoDeliverDays = {
   UPS: Number(process.env.AUTO_DELIVER_UPS_DAYS || 5),
   InPost: Number(process.env.AUTO_DELIVER_INPOST_DAYS || 4),
@@ -595,6 +596,9 @@ app.use(express.json({ limit: '1mb' }))
 app.use(cookieParser())
 
 async function readJson(file, fallback) {
+  const pendingRepair = jsonRepairPromises.get(file)
+  if (pendingRepair) return pendingRepair.catch(() => fallback)
+
   try {
     const content = await fs.readFile(file, 'utf8')
     if (!content.trim()) return fallback
@@ -605,13 +609,19 @@ async function readJson(file, fallback) {
       const content = await fs.readFile(file, 'utf8').catch(() => '')
       const position = Number(String(error.message).match(/position\s+(\d+)/i)?.[1] || -1)
       if (position > 0) {
-        try {
+        const repairPromise = (async () => {
           const recovered = JSON.parse(content.slice(0, position))
           await writeJson(file, recovered)
           console.error(`Repaired JSON in ${file}: removed trailing invalid data after position ${position}`)
           return recovered
+        })()
+        jsonRepairPromises.set(file, repairPromise)
+        try {
+          return await repairPromise
         } catch (_recoverError) {
           // Fall through to warning and fallback.
+        } finally {
+          jsonRepairPromises.delete(file)
         }
       }
       if (!invalidJsonWarnings.has(file)) {
