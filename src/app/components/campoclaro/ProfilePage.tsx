@@ -359,8 +359,9 @@ export function ProfilePage() {
     ])
     const customer = customerResult.status === 'fulfilled' ? customerResult.value.user : null
     const admin = adminResult.status === 'fulfilled' ? adminResult.value.user : null
+    const role = admin?.role === 'admin' || customer?.role === 'admin' ? 'admin' : customer?.role || admin?.role
     setCustomerSignedIn(Boolean(customer))
-    setUser(customer ? { ...customer, role: admin?.role } : admin)
+    setUser(customer ? { ...customer, role } : admin ? { ...admin, role } : null)
     setOrders(ordersResult.status === 'fulfilled' ? ordersResult.value : [])
     setNewsletterEnabled(newsletterResult.status === 'fulfilled' ? newsletterResult.value.enabled : false)
     if (referralResult.status === 'fulfilled') setReferral(referralResult.value)

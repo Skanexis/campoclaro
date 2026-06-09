@@ -79,6 +79,7 @@ const cryptoPaymentTolerance = Number(process.env.CRYPTO_PAYMENT_TOLERANCE || 0.
 const btcMinConfirmations = Number(process.env.BTC_MIN_CONFIRMATIONS || 1)
 const ethMinConfirmations = Number(process.env.ETH_MIN_CONFIRMATIONS || 12)
 const tronMinConfirmations = Number(process.env.TRON_MIN_CONFIRMATIONS || 1)
+const invalidJsonWarnings = new Set()
 const autoDeliverDays = {
   UPS: Number(process.env.AUTO_DELIVER_UPS_DAYS || 5),
   InPost: Number(process.env.AUTO_DELIVER_INPOST_DAYS || 4),
@@ -399,16 +400,17 @@ async function upsertCustomer(user) {
 
 async function customerWithStoredData(user) {
   if (!user?.id) return null
-  const customers = await readJson(customersFile, [])
+  const [customers, adminIds] = await Promise.all([readJson(customersFile, []), getAdminIdSet()])
   const stored = customers.find(item => String(item.id) === String(user.id))
-  if (!stored) return user
+  const role = adminIds.has(String(user.id)) ? 'admin' : user.role || stored?.role || 'customer'
+  if (!stored) return { ...user, role }
   return {
     ...user,
     firstName: user.firstName || stored.firstName || '',
     lastName: user.lastName || stored.lastName || '',
     username: user.username || stored.username || '',
     photoUrl: user.photoUrl || stored.photoUrl || '',
-    role: user.role || stored.role || 'customer',
+    role,
     circleManualXp: Math.max(0, Number(stored.manualXp || 0)),
     referralCode: stored.referralCode || '',
     referralXp: Math.max(0, Number(stored.referralXp || 0)),
@@ -600,7 +602,22 @@ async function readJson(file, fallback) {
   } catch (error) {
     if (error.code === 'ENOENT') return fallback
     if (error instanceof SyntaxError) {
-      console.error(`Invalid JSON in ${file}: ${error.message}`)
+      const content = await fs.readFile(file, 'utf8').catch(() => '')
+      const position = Number(String(error.message).match(/position\s+(\d+)/i)?.[1] || -1)
+      if (position > 0) {
+        try {
+          const recovered = JSON.parse(content.slice(0, position))
+          await writeJson(file, recovered)
+          console.error(`Repaired JSON in ${file}: removed trailing invalid data after position ${position}`)
+          return recovered
+        } catch (_recoverError) {
+          // Fall through to warning and fallback.
+        }
+      }
+      if (!invalidJsonWarnings.has(file)) {
+        invalidJsonWarnings.add(file)
+        console.error(`Invalid JSON in ${file}: ${error.message}`)
+      }
       return fallback
     }
     throw error
@@ -609,7 +626,9 @@ async function readJson(file, fallback) {
 
 async function writeJson(file, data) {
   await fs.mkdir(path.dirname(file), { recursive: true })
-  await fs.writeFile(file, `${JSON.stringify(data, null, 2)}\n`)
+  const temporaryFile = `${file}.${process.pid}.${nanoid(8)}.tmp`
+  await fs.writeFile(temporaryFile, `${JSON.stringify(data, null, 2)}\n`)
+  await fs.rename(temporaryFile, file)
 }
 
 function normalizeAdminRecord(input = {}) {
